@@ -7,7 +7,7 @@ from allennlp.common.testing import AllenNlpTestCase
 from allennlp.data.tokenizers.sentence_splitter import SpacySentenceSplitter
 from allennlp.common.util import get_spacy_model
 
-from my_project.dataset_reader import ClassificationTsvReader
+from ru_col_suggest.dataset_reader import ClassificationTsvReader
 
 
 class TestTextClassificationJsonReader:
