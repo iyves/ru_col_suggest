@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from ufal.udpipe import Model, Pipeline
 
+
 '''
 Этот скрипт принимает на вход необработанный русский текст 
 (одно предложение на строку или один абзац на строку).
@@ -220,16 +221,16 @@ def process(pipeline, text='Строка', keep_pos=True, keep_punct=False):
     return tagged_propn
 
 
-def download_udpipe_model(model_dir = "."):
-    # URL of the UDPipe model
-    udpipe_model_url = 'https://rusvectores.org/static/models/udpipe_syntagrus.model'
-    udpipe_filename = udpipe_model_url.split('/')[-1]
-    model_path = str(Path(model_dir,udpipe_filename))
+model_dir = "./models/"
+# URL of the UDPipe model
+udpipe_model_url = 'https://rusvectores.org/static/models/udpipe_syntagrus.model'
+udpipe_filename = udpipe_model_url.split('/')[-1]
+model_path = str(Path(model_dir,udpipe_filename))
 
-    if not os.path.isfile(model_path):
-        print('UDPipe model not found. Downloading...', file=sys.stderr)
-        wget.download(udpipe_model_url, out=model_path)
+if not os.path.isfile(model_path):
+    print('UDPipe model not found. Downloading...', file=sys.stderr)
+    wget.download(udpipe_model_url, out=model_path)
 
-    print('\nLoading the model...', file=sys.stderr)
-    model = Model.load(model_path)
-    process_pipeline = Pipeline(model, 'tokenize', Pipeline.DEFAULT, Pipeline.DEFAULT, 'conllu')
+print('\nLoading the model from {}...'.format(model_path), file=sys.stderr)
+model = Model.load(model_path)
+process_pipeline = Pipeline(model, 'tokenize', Pipeline.DEFAULT, Pipeline.DEFAULT, 'conllu')
