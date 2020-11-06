@@ -1,3 +1,4 @@
+"""
 from typing import Dict
 
 import torch
@@ -43,3 +44,4 @@ class SimpleClassifier(Model):
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
         return {"accuracy": self.accuracy.get_metric(reset)}
+"""

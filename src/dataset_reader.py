@@ -1,3 +1,4 @@
+"""
 from typing import Dict, Iterable, List
 
 from allennlp.data import DatasetReader, Instance
@@ -33,3 +34,4 @@ class ClassificationTsvReader(DatasetReader):
             for line in lines:
                 text, sentiment = line.strip().split('\t')
                 yield self.text_to_instance(text, sentiment)
+"""

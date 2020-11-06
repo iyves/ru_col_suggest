@@ -7,6 +7,7 @@ Kutuzov A., Kuzmenko E. (2017) WebVectors: A Toolkit for Building Web Interfaces
 source: https://github.com/akutuzov/webvectors
 """
 
+import configparser
 import sys
 import os
 import wget
@@ -14,6 +15,11 @@ import re
 from pathlib import Path
 from ufal.udpipe import Model, Pipeline
 
+path_current_directory = os.path.dirname(__file__)
+path_config_file = os.path.join(path_current_directory, '../../../../',
+                                'config.ini')
+config = configparser.ConfigParser()
+config.read(path_config_file)
 
 '''
 Этот скрипт принимает на вход необработанный русский текст 
@@ -83,7 +89,8 @@ def unify_sym(text):  # принимает строку в юникоде
 
     # [‐‑] -> [-]
     text = list_replace('\u2010\u2011', '\u002D', text)
-
+    text = re.sub('--', '-', text)
+    
     # [          ​  ⁠　] -> [ ] (en space)
     text = list_replace \
             (
@@ -173,6 +180,14 @@ def process(pipeline, text='Строка', keep_pos=True, keep_punct=False):
         if len(t) != 10:
             continue
         (word_id, token, lemma, pos, xpos, feats, head, deprel, deps, misc) = t
+        
+        if token.find("UNK") != -1:
+            tagged_propn.append('[UNK]_UNK')
+            continue
+        elif token.find("NUM") != -1:
+            tagged_propn.append('[NUM]_NUM')
+            continue
+        
         token = clean_token(token, misc)
         lemma = clean_lemma(lemma, pos)
         if not lemma or not token:
@@ -221,11 +236,11 @@ def process(pipeline, text='Строка', keep_pos=True, keep_punct=False):
     return tagged_propn
 
 
-model_dir = "./models/"
+model_dir = config['PATHS']['models_dir']
 # URL of the UDPipe model
 udpipe_model_url = 'https://rusvectores.org/static/models/udpipe_syntagrus.model'
 udpipe_filename = udpipe_model_url.split('/')[-1]
-model_path = str(Path(model_dir,udpipe_filename))
+model_path = str(Path(model_dir, udpipe_filename))
 
 if not os.path.isfile(model_path):
     print('UDPipe model not found. Downloading...', file=sys.stderr)

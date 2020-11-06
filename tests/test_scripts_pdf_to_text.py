@@ -1,6 +1,6 @@
 import pytest
 
-import ru_col_suggest.scripts.pdf_to_text
+import src.scripts.pdf_to_text
 
 
 class PdfParserTest:

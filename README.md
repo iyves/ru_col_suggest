@@ -1,5 +1,16 @@
-# AllenNLP Template Project using Config Files
+## Word embeddings for predicting scholarly word associations
+This project contains:
+- Preprocessing corpora of text extracted in HTML format via PDFBox
+    - `src/preprocess.py`
+    - `src/preprocessor.py`
+- Training and loading word2vec and fastText models, and retrieving semantic 
+neighbors for word associations
+    - word_embedder.py
+- Validation through unittests
+    - 
+---
 
+### Info about allennlp template
 A template for starting a new allennlp project using config files and `allennlp train`.  For simple
 projects, all you need to do is get your model code into the class in `my_project/model.py`, your
 data loading code into the `DatasetReader` code in `my_project/dataset_reader.py`, and that's it,
