@@ -1,6 +1,7 @@
 import configparser
 import gensim
 import logging
+import mysql.connector
 import pickle
 import os
 import random
@@ -26,6 +27,11 @@ log_dir = config['PATHS']['log_dir']
 log_file = str(Path(log_dir, 'train_word_embeddings.txt'))
 logging.basicConfig(handlers=[logging.FileHandler(log_file, 'a', 'utf-8')],
     format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+DOMAIN = config['SERVER']['DOMAIN']
+HOST = config['SERVER']['HOST']
+USER = config['SERVER']['USER']
+PWD = config['SERVER']['PWD']
 
 
 def pickle_loader(pickle_file):
@@ -73,6 +79,37 @@ class WordEmbedder:
         fastText = 'http://vectors.nlpl.eu/repository/20/213.zip'
 
     punctuation = r"!\"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~ʹ…〈〉«»—„“"
+
+    @staticmethod
+    def filter_results(lemmas: List[List[str]]):
+        """
+
+        :param lemmas:
+        :return:
+        """
+        if len(lemmas) == 2:
+            query = "SELECT distinct ng2.lemma_1, ng2.lemma_2, SUM(ng2.ngram_freq), SUM(ng2.doc_freq) " \
+                    "FROM ngrams_2_lex_mv as ng2 " \
+                    "WHERE ng2.lemma_1 in ('{}') and ng2.lemma_2 in ('{}') " \
+                    "GROUP BY ng2.lemma_1, ng2.lemma_2" \
+                .format("','".join(lemmas[0]), "','".join(lemmas[1]))
+        elif len(lemmas) == 3:
+            query = "SELECT distinct ng3.lemma_1, ng3.lemma_2, ng3.lemma_3, SUM(ng3.ngram_freq), SUM(ng3.doc_freq) " \
+                    "FROM ngrams_3_lex_mv as ng3 " \
+                    "WHERE ng3.lemma_1 in ('{}') and ng3.lemma_2 in ('{}') and ng3.lemma_3 in ('{}')" \
+                    "GROUP BY ng3.lemma_1, ng3.lemma_2, ng3.lemma_3" \
+                .format("','".join(lemmas[0]), "','".join(lemmas[1]), "','".join(lemmas[2]))
+        else:
+            logging.error("Error: Can filter results for 2-grams or 3-grams only")
+            return []
+
+        connection = mysql.connector.connect(host=HOST, database=DOMAIN, user=USER, password=PWD)
+        cursor = connection.cursor()
+        cursor.execute(query)
+        query_result = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return query_result
 
     def __init__(self, model_type: Model):
         self.model_type = model_type
@@ -153,10 +190,10 @@ class WordEmbedder:
             sentences = SentencesIterator(self.load_corpus, source)
 
             if self.model_type == self.Model.word2vec:
-                model_w2v = Word2Vec(sentences, size=100, window=10, min_count=3)
+                model_w2v = Word2Vec(sentences, size=100, window=10, min_count=5)
                 model_w2v.save(model_path)
             elif self.model_type == self.Model.fastText:
-                model_fasttest = FastText(sentences, size=100, window=10, min_count=3)
+                model_fasttest = FastText(sentences, size=100, window=10, min_count=5)
                 model_fasttest.save(model_path)
             else:
                 logging.error("ERROR: {} model not supported".format(model_path))
@@ -164,7 +201,7 @@ class WordEmbedder:
         return True
 
     def train_corpus(self, pickles_dir: str, source_folders: Iterable[str],
-                     target_dir: str, target_filename: str = "all.model") -> bool:
+                     target_dir: str, target_filename: str = "all.model", params = None) -> bool:
         """Train the model on the entire corpus.
 
         :param pickles_dir: The root directory that contains the directories
@@ -173,8 +210,17 @@ class WordEmbedder:
             pickle files.
         :param target_dir: The root directory to save the trained model.
         :param target_filename: The filename by which to save the model.
+        :param params: The options to pass onto gensim for training.
         :return: True if the training completed successfully, otherwise False.
         """
+        # Set defaults for training if not specified
+        if params is None:
+            params = {
+                "size": 100,
+                "window": 10,
+                "min_count": 10
+            }
+
         # Set up the article to preprocess
         files = []
         for folder in source_folders:
@@ -189,10 +235,10 @@ class WordEmbedder:
             os.makedirs(target_dir)
 
         if self.model_type == self.Model.word2vec:
-            self.model = Word2Vec(sentences, size=100, window=10, min_count=3)
+            self.model = Word2Vec(sentences, **params)
             self.model.save(model_path)
         elif self.model_type == self.Model.fastText:
-            self.model = FastText(sentences, size=100, window=10, min_count=3)
+            self.model = FastText(sentences, **params)
             self.model.save(model_path)
         else:
             logging.error("ERROR: {} model not supported".format(model_path))
@@ -248,14 +294,14 @@ class WordEmbedder:
         """
         if not self.check_loaded():
             return False
-        return word in self.model.wv.vocab
+        return word in self.model.wv.key_to_index
 
     # Universal POS tags:
     ## ADJ ADP PUNCT ADV AUX SYM
     ## INTJ CCONJ X NOUN DET
     ## PROPN NUM VERB PART PRON SCONJ
     def get_similar(self, in_tokens: Iterable[Tuple[str, Iterable[str]]], topn=10) \
-            -> List[List[Tuple[str, str, int]]]:
+            -> List[List[Tuple[str, str, float]]]:
         """Returns the word embeddings in semantic space that are nearest to
         each token.
 
@@ -314,4 +360,79 @@ class WordEmbedder:
                           .format(word[0], "\n".join(["{:3}. {}"
                                                      .format(idx, similar_word)
                                                       for idx, similar_word in enumerate(word[1], start=1)])))
+        return ret
+
+    def get_similar_combined(self, in_tokens: List[str],
+                             accepted_pos: Iterable[str], topn=10,
+                             cos_type: str = "cossim") \
+            -> List[Tuple[str, str, float]]:
+        if not self.check_loaded():
+            return []
+
+        similar_words = []
+        # word2vec cannot predict oov terms
+        if self.model_type is self.Model.word2vec and \
+                any([token not in self.model.wv.vocab for token in in_tokens]):
+            logging.error("Error: OOV token: {}".format(str(in_tokens)))
+        else:
+            similar_words = []
+            if cos_type == "cossim":
+                similar_words = [tuple(word[0].split("_")) + (word[-1],) for word in
+                                 self.model.wv.most_similar(positive=in_tokens, topn=topn)]
+            elif cos_type == "cosmul":
+                similar_words = [tuple(word[0].split("_")) + (word[-1],) for word in
+                                 self.model.wv.most_similar_cosmul(positive=in_tokens, topn=topn)]
+            else:
+                logging.error("Error: Invalid cos_type, not 'cossim' or 'cosmul': {}".format(cos_type))
+                return []
+
+            if len(accepted_pos) < 1:
+                similar_words = [(word, tag, score) for word, tag, score
+                                     in similar_words]
+            else:
+                similar_words = [(word, tag, score) for word, tag, score
+                                     in similar_words if tag in accepted_pos]
+        return similar_words
+
+    def predict_similar_combined(self, word_pairs: Iterable[Iterable[str]], token_pairs = None,
+                                 accepted_pos: Iterable[str] = None, topn: int = 10,
+                                 verbose: bool = False, cos_type: str = "cossim") -> List:
+        if not self.check_loaded():
+            return []
+        if accepted_pos is None:
+            accepted_pos = []
+
+        ret = []
+        for idx, words in enumerate(word_pairs):
+            similar_words = []
+            # word2vec cannot predict oov terms
+            if self.model_type is self.Model.word2vec and \
+                    any([token not in self.model.wv.vocab for token in words]):
+                logging.error("Error: OOV token: {}".format(str(words)))
+            else:
+                if cos_type == "cossim":
+                    similar_words = [tuple(word[0].split("_")) + (word[-1],) for word in
+                                     self.model.wv.most_similar(positive=words, topn=topn)]
+                elif cos_type == "cosmul":
+                    similar_words = [tuple(word[0].split("_")) + (word[-1],) for word in
+                                     self.model.wv.most_similar_cosmul(positive=words, topn=topn)]
+                else:
+                    logging.error("Error: Invalid cos_type, not 'cossim' or 'cosmul': {}".format(cos_type))
+                    return []
+            word_list = None
+            if token_pairs is None:
+                word_list = [words, similar_words]
+            else:
+                word_list = [token_pairs[idx], words, similar_words]
+            ret.append(word_list)
+
+            if verbose:
+                print("\nwords: {}".format(words))
+                if len(word_list[-1]) < 1:
+                    print("No matches for", word_list)
+                else:
+                    print("{}:\n{}"
+                          .format(word_list[-2], "\n".join(["{:3}. {}"
+                                                           .format(idx, similar_word)
+                                                            for idx, similar_word in enumerate(word_list[-1], start=1)])))
         return ret

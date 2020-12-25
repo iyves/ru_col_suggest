@@ -6,6 +6,7 @@ __pycache__
 *.zip
 *.model
 *.swp
+*.ini
 
 data
 src/models

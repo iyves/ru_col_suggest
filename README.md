@@ -1,13 +1,17 @@
 ## Word embeddings for predicting scholarly word associations
 This project contains:
+- Configuration file `config.ini`
+- Extraction of text from pdf files
+    - `src/scripts/extraction/` 
 - Preprocessing corpora of text extracted in HTML format via PDFBox
     - `src/preprocess.py`
     - `src/preprocessor.py`
 - Training and loading word2vec and fastText models, and retrieving semantic 
 neighbors for word associations
-    - word_embedder.py
+    - `src/word_embedder.py`
+    - `src/train_word_embeddings.py`
 - Validation through unittests
-    - 
+    - `tests/`
 ---
 
 ### Info about allennlp template
