@@ -33,7 +33,7 @@ class HtmlPreprocessor:
         """The current representation of the scholarly text.
         HTML - HTML document in BeautifulSoup format
         LISTS_OF_PAGES_AND_PARAGRAPHS - Text[Page[Paragraph_index]]
-        LISTS_OF_PAGES_AND_PARAGRAPHS - Text[Page[Paragraph[Sentence_index]]]
+        LISTS_OF_PAGES_AND_PARAGRAPHS_AND_SENTENCES - Text[Page[Paragraph[Sentence_index]]]
         """
         HTML = 0
         LISTS_OF_PAGES_AND_PARAGRAPHS = 1
@@ -527,38 +527,6 @@ class HtmlPreprocessor:
                 self.text.pop(i)
         return amount_removed
 
-    """Lemmatize and tokenize a text paragraph by paragraph with udpipe.
-
-    Args:
-        text:
-            The text to tokenize. Paragraphs are delimited by a single newline character
-        keep_pos:
-            Optional; Append the part of speech tag to the end of each token or
-            not. The default behavior is to drop the POS tag.
-        keep_punct:
-            Optional; Keep punctuation marks as separate tokens. The default
-            behavior is to keep punctuation.
-
-    Returns:
-        A list of each paragraph, where each paragraph is a list of lemmatized tokens. 
-    """
-
-    def tokenize(self, keep_pos: bool = False, keep_punct: bool = True):
-        """Lemmatize and tokenize the text by paragraph with udpipe.
-
-        Use Kutuzov's UDPipe model and tokenization script to process the text,
-        paragraph by paragraph for each page.
-
-        :param keep_pos: Flag for keep the Parts-Of-Speech tag with the
-            lemmatized token.
-        :param keep_punct:  Flag for keeping punctuation tokens.
-        :return:  A generators that yields pages of lemmatized, tokenized
-            paragraphs.
-        """
-        for page in self.text:
-            yield [[kutuzov.process(kutuzov.process_pipeline, text=sentence, keep_pos=keep_pos, keep_punct=keep_punct)
-                    for sentence in paragraph] for paragraph in page]
-
     def preprocess(self) -> bool:
         # Phase 0 - HTML
         self.extract_text_from_html()
@@ -602,3 +570,4 @@ class HtmlPreprocessor:
             logging.error("Entire text was deleted after removing unwanted sentences: {}".format(self.filename))
             return False
         return True
+
