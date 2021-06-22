@@ -83,12 +83,12 @@ class Tokenizer:
                     if res[-1] not in ['.', '!', '?']:
                         res += '.'
 
-                    tags = tagger.tag_text(res)
+                    tags = Tokenizer.tagger.tag_text(res)
                     tags = [t.split() for t in tags]
                     sentence = []
                     for t in tags:
                         if keep_pos:
-                            if t[1] != 'SENT' and t[1][0] in accepted_tags:
+                            if t[1] != 'SENT' and t[1][0] in Tokenizer.accepted_tags:
                                 lemma_tag = t[2] + "_" + t[1][0]
                                 if t[0] == "numarab" or t[0] == "numlat":
                                     lemma_tag = t[2] + "_M"
