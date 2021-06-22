@@ -3,7 +3,7 @@ import pytest
 
 from pathlib import Path
 from src.helpers import get_text, get_file_names
-from src.preprocessor import HtmlPreprocessor
+from src.html_preprocessor import HtmlPreprocessor
 
 
 test_folder = Path("./fixtures/")
