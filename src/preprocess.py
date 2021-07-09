@@ -1,7 +1,6 @@
 import configparser
 import logging
 import os
-import pickle
 
 from joblib import delayed, Parallel
 from pathlib import Path
