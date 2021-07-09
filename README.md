@@ -30,8 +30,8 @@ Lemmatization, other final preprocessing steps: https://colab.research.google.co
     - `src/scripts/extraction/` 
 - Preprocessing corpora of text extracted in HTML format via PDFBox
     - `src/html_preprocessor.py`
-    - `src/tokenizer.py`
     - `src/preprocess.py`
+    - `src/tokenizer.py`
 - Training and loading word2vec and fastText models, and retrieving semantic 
 neighbors for word associations
     - `src/word_embedder.py`
@@ -39,9 +39,140 @@ neighbors for word associations
 - Validation through unittests
     - `tests/`
 
-_note: additional instructions for using the treetagger tokenizer:_ \
-In order to use the treetagger for tokenization, run the following from the src
-dir:
+#### Setting up the config.ini file
+The config.ini file contains the full paths of the folders in which training data,
+models, and logs reside. It also contains the connection information for attesting 
+collocations against the cybercat database. The format of this file is as follows:
+```text
+[PATHS]
+models_dir=path/to/ru_col_suggest/src/models
+log_dir=path/to/ru_col_suggest/data/log
+data_dir=path/to/ru_col_suggest/data/
+
+pickles_dir=path/to/ru_col_suggest/data/preprocessed/pickle
+preprocessed_text_dir=path/to/ru_col_suggest/data/preprocessed/text
+
+[SERVER]
+DOMAIN=domain
+HOST=server_ip
+USER=username
+PWD=pwd
+```
+
+
+#### Extracting text from pdfs
+In the `src/scripts/extraction` folder there are scripts for two methods of extracting text
+from a pdf document:
+- [Kutuzov's method](https://github.com/rusnlp/rusnlp/blob/033ef738e7791bb60afb398647c3d0512eaff4bc/code/web/backend/preprocessing/pdf_parser/make_txt_from_pdf.py): pdf_to_text.py
+- [PDFBox method](https://pdfbox.apache.org/download.cgi): pdfparse_pdf_box.sh
+
+There is also a python script for checking the text extraction. It confirms whether or not there is
+a matching extracted file for each pdf file.
+- check_parsed_files.py
+
+Prior to text extraction, pdfs of Russian academic papers must be stored in the 
+`data/pdf` folder.
+
+##### Extraction methods
+_Kutuzov's method_ \
+This method involves the usage of [pdfminer3](https://pypi.org/project/pdfminer3/)
+to extract text from pdf files.
+
+The `pdf_to_text.py` script is a modified version of Kutuzov's pdf to text extraction script.
+The modifications allow for multi-threaded extraction. The `-N` option controls the amount of 
+threads to use in parallel.
+
+The following command, when run from the `src/scripts/extraction` folder, will
+extract text from pdfs in parallel on 4 threads:
+```bash
+python3 pdf_to_text.py --source-dir ../../data/pdf/ --target-dir ../../data/extracted/txt -N 4 -v
+```
+
+The script should automatically remove hyphenation from the text, but further preprocessing
+may be necessary for removing headers, footers, page numbers, and in-text citations.
+
+_PDFBox method_ \
+The `pdfparse_pdf_box.sh` bash script involves the usage of PDFBox to covert pdf
+documents into an html representation, which can be further processed. This method is used
+for extracting the training data from CAT academic papers. This method can also extract only the text from
+the pdf documents, but it will not automatically remove hyphenation.
+
+Before running the script, PDFBox must be installed. This research uses the PDFBox standalone
+command line tools: `pdfbox-app-2.0.21.jar`.
+PDFBox can be installed from the [PDFBox homepage](https://pdfbox.apache.org/download.cgi).
+
+The following command extracts the structure of all linguistics pdf documents into an html format on four threads in parallel.
+Change the number at the end to modify the amount of threads to use.
+```bash
+bash ./parse_pdf_box.sh path/to/pdfbox-app-2.0.21.jar ../../../data/pdf/linguistics ../../../data/extracted/html/linguistics 4
+```
+
+##### Validation of text extraction
+The `check_parsed_files.py` script checks that there is a matching extracted file for each input pdf file.
+Files extracted may be in .txt or .html format.
+
+```bash
+# Checking that pdfs are extracted into .txt files
+python3 check_parsed_files.py --source-dir ../../../data/pdf --target-dir ../../../data/extracted/txt --file-type .txt -v
+
+# Checking that pdfs are extracted into .html files
+python3 check_parsed_files.py --source-dir ../../../data/pdf --target-dir ../../../data/extracted/html --file-type .html -v
+```
+
+
+#### Preprocessing of text
+There are three methods for preprocessing text. Liza's method was used for preprocessing text from
+the cybercat database, whereas the PDFBox method was used for preprocessing text from the CAT database. 
+
+The `src/scripts/preprocessing` folder includes two methods:
+- [Kutuzov's method](https://github.com/akutuzov/webvectors/blob/db517610a5d9b5cb6c5f3fa3c55877c1291c0ec1/preprocessing/rus_preprocessing_udpipe.py): kutuzov/rus_preprocessing_udpipe.py
+- Liza's method: liza/CAT_preprocessing.py
+
+The `src` folder includes files for preprocessing html files extracted via the PDFBox method.
+The `preprocess.py` script uses the `HtmlPreprocessor` class to extract only the body text of the academic paper.
+This occurs in three phases, totalling to sixteen steps:
+
+&nbsp;&nbsp;&nbsp;&nbsp;__Phase 0: HTML - *HTML document in BeautifulSoup format*__
+1. Break down the html document into pages and paragraphs, using [Kutuzov's unify_sym function](https://github.com/akutuzov/webvectors/blob/db517610a5d9b5cb6c5f3fa3c55877c1291c0ec1/preprocessing/rus_preprocessing_udpipe.py#L72)
+for the unification of similar-looking symbols. 
+     
+   __Phase 1: List of Pages and Paragraphs - *Text[Page[Paragraph_index]]*__
+2. Remove the references section.
+3. Remove the keywords section and any preceding text (abstract & title).
+4. Remove the header and footer from each page.
+5. Remove footnotes, as well as the in-text references to footnotes.
+6. Remove the End-of-Line hyphenation.
+7. Replace punctuation at the end of sentences with a period.
+8. Join sentences that were split at a paragraph or page boundary.
+9. Replace all quoted strings of text with a `QUOTE` token.
+10. Replace all bold and italicized text with a `STYLE` token.
+11. Remove examples from the text. Examples are defined as any lines that begin with a parenthesized 1 or 2 digit number, and any lines that begin with whitespace followed by a long hyphen.
+12. Remove in-text references.
+13. Replace all strings of Out-Of-Vocabulary characters with an `UNK` token. OOV tokens are defined here as any words that contain a character that
+        is not either a cyrillic character, a roman numeral, an arabic numeral,
+        a whitespace character, or a punctuation mark.
+14. Replace tokens consisting only of numbers with a `NUM` token.
+        Tokens consisting only of 0-9 are replaced with a `NUM_arab` token.
+        Tokens consisting only of XVI are replaced with a `NUM_lat` token.
+
+    __Phase 2: List of Pages and Paragraphs and Sentences - *Text[Page[Paragraph[Sentence_index]]]*__
+15. Break paragraphs into sentences with the [nltk sentence tokenizer](https://www.nltk.org/api/nltk.tokenize.html).
+16. Remove all sentences with unwanted tokens. Sentences that contain a `UNK`, `QUOTE`, or `STYLE` token are considered unwanted.
+
+The resulting text is stored in the .text field of the HtmlPreprocessor class as a list of pages, which is a list of paragraphs, which is a list of sentences. 
+This text should be saved as in a .txt format with each sentence delimited with a newline for tokenization.
+
+Next, the `tokenizer.py` script transforms the preprocessed sentences into tokens using one of
+three methods:
+- [TreeTagger method](https://www.cis.uni-muenchen.de/~schmid/tools/TreeTagger/): Default method
+- [UDPipe / Kutuzov's method](https://github.com/akutuzov/webvectors/blob/db517610a5d9b5cb6c5f3fa3c55877c1291c0ec1/preprocessing/rus_preprocessing_udpipe.py)
+- [MyStem method](https://pypi.org/project/pymystem3/): Uses Yandex's Mystem lemmatizer.
+
+The default is to use the TreeTagger method, keep Part-of-Speech tags, and remove punctuation (only relevant for UDPipe).
+
+Note: The UDPipe method will automatically download Kutuzov's latest trained UDPipe model. Must run `pip install ufal.udpipe`. [Tutorial](https://github.com/akutuzov/webvectors/blob/master/preprocessing/rusvectores_tutorial.ipynb) \
+Note: The TreeTagger method requires additional installation, which can be done by running the following from the `src`
+folder:
 ```
 wget https://www.cis.lmu.de/~schmid/tools/TreeTagger/data/tree-tagger-linux-3.2.3.tar.gz
 wget https://www.cis.lmu.de/~schmid/tools/TreeTagger/data/tagger-scripts.tar.gz
@@ -50,6 +181,103 @@ wget http://corpus.leeds.ac.uk/mocky/russian.par.gz
 sh install-tagger.sh
 wget http://corpus.leeds.ac.uk/mocky/ru-table.tab
 ```
+
+The `src/preprocess.py` script preprocesses all .html files in parallel. This script assumes that the
+.html files, as extracted from pdfs via the PDFBox method, are partitioned by discipline (Linguistics, Economics, etc.), i.e. `data/extracted/html/Linguistics/`. 
+The preprocessed text is saved to the directory `data/preprocessed/text`, and the lemmatized sentences are saved to
+the directory `data/preprocessed/tokens`.
+
+---
+
+*Note: In the future, the following script should be refactored into the existing `preprocess.py` file.*
+
+The `src/combine_preprocessed_text.py` script combines all the preprocessed text into a 
+single .txt file for ease of training. It is also used for further preprocessing of the 
+cybercat texts, preprocessed via Liza's method. 
+
+First, download the cybercat texts from gdrive, keeping them as .zip folders, partitioned by discipline (Linguistics, Economics, etc.). 
+This script assumes that the .zip files are stored in the directory `data/cybercat_texts`.
+
+
+This script does some additional preprocessing and removes corrupted
+sentences. Corrupted sentences are those which which have an average word length less than
+or equal to five. One again, this script should later be refactored to be included in the existing 
+preprocessing script.
+
+#### Training models
+After the preprocessed CAT and cybercat corpora are stored as individual text files in the format 
+of lemmatized sentences delimited with a newline, the word embedding models may be trained.
+
+This project learns four word embedding models:
+- [Word2vec](https://radimrehurek.com/gensim/models/word2vec.html): Gensim's implementation of Google's CBOW algorithm.
+- [FastText](https://radimrehurek.com/gensim/models/fasttext.html): Gensim's implementation of Facebook's FastText model.
+- [GloVe](https://stackoverflow.com/questions/48962171/how-to-train-glove-algorithm-on-my-own-corpus): GloVe implementation in python via the [glove-python-binary](https://pypi.org/project/glove-python-binary/) library.
+- [RoBERTa](https://github.com/huggingface/transformers): Huggingface implementation of the RuBERT model.
+
+Training is done via google colab on High RAM GPUs:
+- [Static word embeddings]()
+- [Dynamic word embeddings]()
+
+#### Using trained models
+Trained word embedding models can be used for erroneous collocation correction. There
+are two different approaches, depending on the type of word embedding used.
+
+_Static word embedding approach_ \
+This is the approach used for the w2v, fastText, and GloVe models. It follows our
+algorithm outlined in [1] and [2]:
+1. For a collocation consisting of n tokens, fix up to n-1 tokens.
+2. Attest all possible collocation combinations, considering replacements for
+un-fixed tokens that match the PoS tag of the original token.
+3. Rank attested collocations by various collocatiability scores.
+4. Select the collocations within a specified collocatiability threshold.
+
+Attesting collocations requires connecting
+
+_Dynamic word embedding approach_ \
+This approach applies to the RuBERT model, using masked language modeling to suggest
+one or more corrections to a collocation, given the source sentence as context.
+
+
+#### Transferring files from gdrive to gcloud
+The method shown in the following colab gist shows how to copy a file from a gdrive
+account to a gcloud account. This was used to transfer the MySQL backup file of the
+cybercat database to gcloud for importing:
+[upload_cybercat.ipynb](https://gist.github.com/iyves/b966fd48c7a9043b0ea4046397f00314)
+
+#### Model Evaluation
+Collocations may be incorrect due to the collocations not existing in Russian, or 
+to not being appropriate for academic style. That being said, the evaluation of erroneous collocation correction is difficult for two reasons:
+1. There is no database to our knowledge for the evaluation of the closure task for Russian collocations.
+2. There exists no database to our knowledge for the evaluation of Russian academic collocations.
+
+To address these issues, we generate and manually label a dataset of erroneous collocations. These collocations are sourced
+from a variety of methods:
+- Collocation extraction from the kittens database
+- Generation of collocations using the [CrossLexica](https://www.xl.gelbukh.com/) dictionary resource.
+
+_Collocation extraction from kittens_ \
+The kittens database is created by our previous research [1][2]. It consists of texts
+from students of Russian as a foreign language at various levels of proficiency.
+Each line of the evaluation file contains a correct Russian academic collocation and 
+for incorrect variants.
+
+_Collocation extraction using the CrossLexica dictionary._ \
+The CrossLexica dictionary is a resource that provides synonyms, collocations, and other 
+information for a given Russian input. Our method for generating erroneous collocation is as follows:
+1. Extract the top 500 most frequent bigrams and trigrams that match a specified PoS filter:
+    - Verb + Noun
+    - Noun + Noun
+    - Adjective + Noun
+    - Verb + Verb
+    - Verb + Infinitive
+    - Verb + Preposition + Noun
+    - Noun + Preposition + Noun
+2. For each collocation, search CrossLexica for the synonyms of the first and last token in the collocation.
+3. Fix either the first or last token and replace the other token with its synonyms.
+4. Manually select the tokens that are not obviously incorrect.
+
+The following colab document extrapolates on this process [here]().
+
 
 ---
 ### Sources
