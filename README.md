@@ -19,27 +19,17 @@ The first part of this research is the extraction and preprocessing of text from
 
 The preprocessed text is then used as training data for the second part of this research. Word embeddings and transformer-based language models are trained on GPUs via Google Colab. The word embedding models include: word2vec, Fasttext, GloVe, while the transformer-based language models are BERT, Elmo, and GPT-3. The methods used for the correction of academic collocation errors is the same for the word models, however, the language models use a fundamentally different approach (we are still experimenting with the best way to use language models for this task). 
 
-### Related links:
-Colab notebook for training the models: https://colab.research.google.com/drive/1mG6x22ll75A1fjFQZUmGADPTp-j0XvXZ?usp=sharing \
-Lemmatization, other final preprocessing steps: https://colab.research.google.com/drive/1BeRZOPHQfthUfK53uNcj4hWOLadActxu?usp=sharing
+## Project Contents
+- [Setting up the config file](#setting-up-the-configini-file)
+- [Text extraction from Russian academic papers in pdf format](#extracting-text-from-pdfs)
+- [Text preprocessing](#preprocessing-of-text)
+- [Training word embeddings and language models](#training-models)
+- [Erroneous collocation correction with trained models](#using-trained-models)
+- [Setting up a gcloud MySQL instance of cybercat](#setting-up-a-gcloud-mysql-instance-of-cybercat)
+- [Model Evaluation](#model-evaluation)
+- [Sources](#sources)
 
-
-## Contents
-- Configuration file `config.ini`
-- Extraction of text from pdf files
-    - `src/scripts/extraction/` 
-- Preprocessing corpora of text extracted in HTML format via PDFBox
-    - `src/html_preprocessor.py`
-    - `src/preprocess.py`
-    - `src/tokenizer.py`
-- Training and loading word2vec and fastText models, and retrieving semantic 
-neighbors for word associations
-    - `src/word_embedder.py`
-    - `src/train_word_embeddings.py`
-- Validation through unittests
-    - `tests/`
-
-#### Setting up the config.ini file
+## Setting up the config.ini file
 The config.ini file contains the full paths of the folders in which training data,
 models, and logs reside. It also contains the connection information for attesting 
 collocations against the cybercat database. The format of this file is as follows:
@@ -60,7 +50,7 @@ PWD=pwd
 ```
 
 
-#### Extracting text from pdfs
+## Extracting text from pdfs
 In the `src/scripts/extraction` folder there are scripts for two methods of extracting text
 from a pdf document:
 - [Kutuzov's method](https://github.com/rusnlp/rusnlp/blob/033ef738e7791bb60afb398647c3d0512eaff4bc/code/web/backend/preprocessing/pdf_parser/make_txt_from_pdf.py): pdf_to_text.py
@@ -73,8 +63,18 @@ a matching extracted file for each pdf file.
 Prior to text extraction, pdfs of Russian academic papers must be stored in the 
 `data/pdf` folder.
 
-##### Extraction methods
-_Kutuzov's method_ \
+### Extraction methods
+This project details two methods for extracting plain text from Russian academic
+papers in pdf format. This task is deceivingly challenging due to the complex structure 
+of pdfs [7]. The lack of standardized style formatting of academic papers further
+complicates matters, as the presence and location of headers, footers, page numbers,
+footnotes, and paper sections widely vary between disciplines and journals.
+
+This project utilizes the PDFBox method, which allows for more fine-tuned parsing
+by first transforming pdf documents into HTML. This keeps information about whitespace
+and stylized text.
+
+#### Kutuzov's method
 This method involves the usage of [pdfminer3](https://pypi.org/project/pdfminer3/)
 to extract text from pdf files.
 
@@ -91,7 +91,7 @@ python3 pdf_to_text.py --source-dir ../../data/pdf/ --target-dir ../../data/extr
 The script should automatically remove hyphenation from the text, but further preprocessing
 may be necessary for removing headers, footers, page numbers, and in-text citations.
 
-_PDFBox method_ \
+#### PDFBox method
 The `pdfparse_pdf_box.sh` bash script involves the usage of PDFBox to covert pdf
 documents into an html representation, which can be further processed. This method is used
 for extracting the training data from CAT academic papers. This method can also extract only the text from
@@ -107,7 +107,7 @@ Change the number at the end to modify the amount of threads to use.
 bash ./parse_pdf_box.sh path/to/pdfbox-app-2.0.21.jar ../../../data/pdf/linguistics ../../../data/extracted/html/linguistics 4
 ```
 
-##### Validation of text extraction
+### Validation of text extraction
 The `check_parsed_files.py` script checks that there is a matching extracted file for each input pdf file.
 Files extracted may be in .txt or .html format.
 
@@ -120,7 +120,7 @@ python3 check_parsed_files.py --source-dir ../../../data/pdf --target-dir ../../
 ```
 
 
-#### Preprocessing of text
+## Preprocessing of text
 There are three methods for preprocessing text. Liza's method was used for preprocessing text from
 the cybercat database, whereas the PDFBox method was used for preprocessing text from the CAT database. 
 
@@ -204,7 +204,7 @@ sentences. Corrupted sentences are those which which have an average word length
 or equal to five. One again, this script should later be refactored to be included in the existing 
 preprocessing script.
 
-#### Training models
+## Training models
 After the preprocessed CAT and cybercat corpora are stored as individual text files in the format 
 of lemmatized sentences delimited with a newline, the word embedding models may be trained.
 
@@ -214,15 +214,14 @@ This project learns four word embedding models:
 - [GloVe](https://stackoverflow.com/questions/48962171/how-to-train-glove-algorithm-on-my-own-corpus): GloVe implementation in python via the [glove-python-binary](https://pypi.org/project/glove-python-binary/) library.
 - [RoBERTa](https://github.com/huggingface/transformers): Huggingface implementation of the RuBERT model.
 
-Training is done via google colab on High RAM GPUs:
-- [Static word embeddings]()
-- [Dynamic word embeddings]()
+Training is done via google colab on High RAM GPUs. This process is detailed in the 
+`train_models.ipynb` colab file.
 
-#### Using trained models
+## Using trained models
 Trained word embedding models can be used for erroneous collocation correction. There
 are two different approaches, depending on the type of word embedding used.
 
-_Static word embedding approach_ \
+### Static word embedding approach
 This is the approach used for the w2v, fastText, and GloVe models. It follows our
 algorithm outlined in [1] and [2]:
 1. For a collocation consisting of n tokens, fix up to n-1 tokens.
@@ -233,18 +232,33 @@ un-fixed tokens that match the PoS tag of the original token.
 
 Attesting collocations requires connecting
 
-_Dynamic word embedding approach_ \
+### Dynamic word embedding approach
 This approach applies to the RuBERT model, using masked language modeling to suggest
 one or more corrections to a collocation, given the source sentence as context.
 
+## Setting up a Gcloud MySQL instance of cybercat
+Collocations are attested on the cybercat database, which can be run locally or
+through a cloud service. This project used gcloud and MySQL 8. A backup of the local
+cybercat database was stored on gdrive and transferred to gcloud. Then, the backup
+was used to import the cybercat data onto a MySQL 8 server created in gcloud.
 
-#### Transferring files from gdrive to gcloud
-The method shown in the following colab gist shows how to copy a file from a gdrive
+The first step is to create a bucket on gcloud (Storage>Cloud Storage) to store the cybercat backup. The 
+backup file should already be in gdrive.
+
+The colab document [`upload_cybercat_dump.ipynb`](upload_cybercat_dump.ipynb) shows how to copy a file from a gdrive
 account to a gcloud account. This was used to transfer the MySQL backup file of the
-cybercat database to gcloud for importing:
-[upload_cybercat.ipynb](https://gist.github.com/iyves/b966fd48c7a9043b0ea4046397f00314)
+cybercat database to gcloud for importing.
 
-#### Model Evaluation
+Create a MySQL database on gcloud using MySQL version 8.0 (Databases>SQL). Then, import the data from 
+the bucket to the cloud database. After about 4.5 hours, the import should complete, and the bucket may be deleted.
+
+To connect to the database, you must modify the server's network security configuration to
+allow for external access. This is detailed in the [gcloud documentation](https://cloud.google.com/sql/docs/mysql/authorize-networks).
+The easiest method for testing is to add a network, and specify the IP address and subnet mask
+for the computers from which the server will be accessed. Adjust the `config.ini`
+file accordingly.
+
+## Model Evaluation
 Collocations may be incorrect due to the collocations not existing in Russian, or 
 to not being appropriate for academic style. That being said, the evaluation of erroneous collocation correction is difficult for two reasons:
 1. There is no database to our knowledge for the evaluation of the closure task for Russian collocations.
@@ -255,13 +269,13 @@ from a variety of methods:
 - Collocation extraction from the kittens database
 - Generation of collocations using the [CrossLexica](https://www.xl.gelbukh.com/) dictionary resource.
 
-_Collocation extraction from kittens_ \
+### Collocation extraction from kittens
 The kittens database is created by our previous research [1][2]. It consists of texts
 from students of Russian as a foreign language at various levels of proficiency.
 Each line of the evaluation file contains a correct Russian academic collocation and 
 for incorrect variants.
 
-_Collocation extraction using the CrossLexica dictionary._ \
+### Collocation extraction using the CrossLexica dictionary
 The CrossLexica dictionary is a resource that provides synonyms, collocations, and other 
 information for a given Russian input. Our method for generating erroneous collocation is as follows:
 1. Extract the top 500 most frequent bigrams and trigrams that match a specified PoS filter:
@@ -276,8 +290,7 @@ information for a given Russian input. Our method for generating erroneous collo
 3. Fix either the first or last token and replace the other token with its synonyms.
 4. Manually select the tokens that are not obviously incorrect.
 
-The following colab document extrapolates on this process [here]().
-
+The colab document [`generate_wrong_colloc.ipynb`](generate_wrong_colloc.ipynb) extrapolates on this process.
 
 ---
 ### Sources
@@ -286,4 +299,5 @@ The following colab document extrapolates on this process [here]().
 [3]     S. Rodríguez-Fernández, L. Espinosa-Anke, R. Carlini and L. Wanner, "Semantics-Driven Recognition of Collocations Using Word Embeddings," in Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, Berlin, 2016.  \
 [4]     E. Kochamar and T. Briscoe, "Detecting Learner Errors in the Choice of Content Worsd Using Compositional Distributional Semantics," in Proceedings of COLING 2014, the 25th International Meeting on Computational Linguistics, Dublin, 2014.  \
 [5]     D. Alikaniotis and V. Raheja, "The Unreasonable Effectiveness of Transformer Language Models in Grammatical Error Correction," in 57th Annual Meeting of the Association for Computational Linguistics, Florence, 2019.  \
-[6]     "PoA - Dist Sem," [Online]. Available: https://docs.google.com/document/d/1roYsQNsmZ2y2lLftn3QCgG293wpQBBlIH48KzK03GBk/edit?usp=sharing. 
+[6]     "PoA - Dist Sem," [Online]. Available: https://docs.google.com/document/d/1roYsQNsmZ2y2lLftn3QCgG293wpQBBlIH48KzK03GBk/edit?usp=sharing. \
+[7]     A. Hashmi, F. Qayyum and M. Afzal, "Insights to the state-of-the-art PDF Extraction Techniques," in IPSI Transaction on Internet Research(16), pp. 1820-4503, 2020.
