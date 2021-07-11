@@ -4,6 +4,7 @@ import logging
 import os
 import pandas
 import treetaggerwrapper
+from typing import Iterable, List
 
 from enum import Enum
 from pathlib import Path
@@ -55,9 +56,53 @@ class Tokenizer:
             if Tokenizer.process_pipeline is None:
                 Tokenizer.process_pipeline = kutuzov.load_model()
 
-    def tokenize(self, input_file, output_file, keep_pos: bool = True,
-                 keep_punct: bool = False, batch: int = 10000, start: int = 0,
-                 end: int = -1) -> int:
+    def tokenize(self, sentences: Iterable[str], keep_pos: bool = True,
+                 keep_punct: bool = False) -> List[str]:
+        """Tokenize a list of sentences via the selected method.
+
+        :param sentences: The input to preprocess.
+        :param keep_pos: Flag for keeping the Parts-Of-Speech tag with the
+            lemmatized token. Ex. банк_N. Default: True
+        :param keep_punct: Flag for keeping punctuation tokens. Only relevant
+            for UDPipe. Default: False
+        :return A list containing the tokenized input sentences.
+        """
+        ret = []
+        for sentence in sentences:
+            res = kutuzov.unify_sym(sentence.strip())
+            if self.method is self.Method.UDPIPE:
+                output = " ".join(kutuzov.process(Tokenizer.process_pipeline,
+                                                  text=res, keep_pos=keep_pos, keep_punct=keep_punct))
+                ret.append(output.replace("numarab_PROPN", "numarab_NUM")
+                                 .replace("numlat_PROPN", "numlat_NUM"))
+            elif self.method is self.Method.TREETAGGER:
+                if res[-1] not in ['.', '!', '?']:
+                    res += '.'
+
+                tags = Tokenizer.tagger.tag_text(res)
+                tags = [t.split() for t in tags]
+                sentence = []
+                for t in tags:
+                    if keep_pos:
+                        if t[1] != 'SENT' and t[1][0] in Tokenizer.accepted_tags:
+                            lemma_tag = t[2] + "_" + t[1][0]
+                            if t[0] == "numarab" or t[0] == "numlat":
+                                lemma_tag = t[2] + "_M"
+                            if keep_pos:
+                                sentence.append(lemma_tag)
+                    else:
+                        sentence.append(t[2])
+                output = " ".join(sentence)
+                ret.append(output)
+            elif self.method is self.Method.MYSTEM:
+                raise NotImplementedError
+            else:
+                raise NotImplementedError
+        return ret
+
+    def tokenize_file(self, input_file, output_file, keep_pos: bool = True,
+                      keep_punct: bool = False, batch: int = 10000, start: int = 0,
+                      end: int = -1) -> int:
         """Lemmatize and tokenize the text by paragraph with the specified method.
 
         :param input_file: The full path to the file that contains the text to
@@ -73,7 +118,6 @@ class Tokenizer:
         :param end: When to end lemmatization. Default: -1 (lemmatize everything)
         :return The amount of lines processed, as an int
         """
-
         total = 0
         sentences = []
         for sentence in codecs.open(input_file, "r", "utf-8"):
@@ -82,35 +126,7 @@ class Tokenizer:
                 break
 
             if total >= start:
-                res = kutuzov.unify_sym(sentence.strip())
-                if self.method is self.Method.UDPIPE:
-                    output = " ".join(kutuzov.process(Tokenizer.process_pipeline,
-                        text=res, keep_pos=keep_pos, keep_punct=keep_punct))
-                    sentences.append(output.replace("numarab_PROPN", "numarab_NUM")
-                                     .replace("numlat_PROPN", "numlat_NUM"))
-                elif self.method is self.Method.TREETAGGER:
-                    if res[-1] not in ['.', '!', '?']:
-                        res += '.'
-
-                    tags = Tokenizer.tagger.tag_text(res)
-                    tags = [t.split() for t in tags]
-                    sentence = []
-                    for t in tags:
-                        if keep_pos:
-                            if t[1] != 'SENT' and t[1][0] in Tokenizer.accepted_tags:
-                                lemma_tag = t[2] + "_" + t[1][0]
-                                if t[0] == "numarab" or t[0] == "numlat":
-                                    lemma_tag = t[2] + "_M"
-                                if keep_pos:
-                                    sentence.append(lemma_tag)
-                        else:
-                            sentence.append(t[2])
-                    output = " ".join(sentence)
-                    sentences.append(output)
-                elif self.method is self.Method.MYSTEM:
-                    raise NotImplementedError
-                else:
-                    raise NotImplementedError
+                sentence.append(self.tokenize([sentence, keep_pos, keep_punct])[0])
 
                 if total % batch == 0:
                     logging.info(f"Processed {len(sentences)} sentences")

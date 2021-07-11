@@ -47,7 +47,7 @@ def preprocess_one(filename, file, target_txt_path, target_token_path,
     # Save the tokenized preprocess text as a txt file
     output_token_file = Path(target_token_path, filename + ".txt")
     tokenizer = Tokenizer(method)
-    tokenizer.tokenize(output_txt_file, output_token_file)
+    tokenizer.tokenize_file(output_txt_file, output_token_file)
 
     logging.info("Preprocessed and tokenized file: {}".format(filename))
     print(filename, end=", ")
