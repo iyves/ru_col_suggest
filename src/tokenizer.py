@@ -26,9 +26,10 @@ class Tokenizer:
     """Process Russian text into lemmatized tokens.
     """
 
-    tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR='.')
-    tag_table = pandas.read_table('ru-table.tab')
     accepted_tags = ['A', 'C', 'I', 'M', 'N', 'P', 'Q', 'R', 'S', 'V']
+    tagger = None
+    tag_table = None
+    process_pipeline = None
 
     class Method(Enum):
         """The method to use for tokenization.
@@ -45,6 +46,14 @@ class Tokenizer:
         :param method: The method to use for tokenization, default: TREETAGGER
         """
         self.method = method
+        if self.method == self.Method.TREETAGGER:
+            if Tokenizer.tagger is None:
+                Tokenizer.tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR='.')
+            if Tokenizer.tag_table is None:
+                Tokenizer.tag_table = pandas.read_table('ru-table.tab')
+        elif self.method == self.Method.UDPIPE:
+            if Tokenizer.process_pipeline is None:
+                Tokenizer.process_pipeline = kutuzov.load_model()
 
     def tokenize(self, input_file, output_file, keep_pos: bool = True,
                  keep_punct: bool = False, batch: int = 10000, start: int = 0,
@@ -75,7 +84,7 @@ class Tokenizer:
             if total >= start:
                 res = kutuzov.unify_sym(sentence.strip())
                 if self.method is self.Method.UDPIPE:
-                    output = " ".join(kutuzov.process(kutuzov.process_pipeline,
+                    output = " ".join(kutuzov.process(Tokenizer.process_pipeline,
                         text=res, keep_pos=keep_pos, keep_punct=keep_punct))
                     sentences.append(output.replace("numarab_PROPN", "numarab_NUM")
                                      .replace("numlat_PROPN", "numlat_NUM"))
