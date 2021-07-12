@@ -253,9 +253,9 @@ Create a MySQL database on gcloud using MySQL version 8.0 (Databases>SQL). Then,
 the bucket to the cloud database. After about 4.5 hours, the import should complete, and the bucket may be deleted.
 
 To connect to the database, you must modify the server's network security configuration to
-allow for external access. This is detailed in the [gcloud documentation](https://cloud.google.com/sql/docs/mysql/authorize-networks).
+allow for external access (SQL>Primary Instance>Connections). This is detailed in the [gcloud documentation](https://cloud.google.com/sql/docs/mysql/authorize-networks).
 The easiest method for testing is to add a network, and specify the IP address and subnet mask
-for the computers from which the server will be accessed. Adjust the `config.ini`
+for the computers from which the server will be accessed (Connections>Networking>Add Network). Adjust the `config.ini`
 file accordingly.
 
 ## Model Evaluation
