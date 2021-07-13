@@ -84,7 +84,9 @@ class CollocationAttestor:
     def get_frequency(self, ngrams: List[str]):
         """Returns the frequency of one or more lemmatized ngrams in the cybercat db.
 
-        :param lemmas: The ngrams for which frequencies should be returned.
+        :param ngrams: The ngrams for which frequencies should be returned.
+            Note: All ngrams must contain the same amount of tokens.
+            Ex. ['что делать', 'рассматривать дело', 'новый метод']
         :return The frequencies of the inputted lemmas if they exist in the db.
         """
         if len(ngrams) == 0:
@@ -167,8 +169,9 @@ class CollocationAttestor:
         trigrams.
 
         :param lemmas: Two lists (bigrams) or three lists (trigrams) of tokens
-            to attest. Ex. [['мочь', 'что'], [['быть', 'делать']]
-            or [['рассматривать'], ['потребность', 'школа'] ['экономика']].
+            to attest. Ex. [['мочь']], [['быть', 'делать']] for 'моч быть' and 'мочь делать'
+            or [['рассматривать'], ['потребность', 'школа'] ['экономика']] for
+            'рассматривать потребность экономика' and 'рассматривать школа экономика'.
         :return The lemmatized bigrams or trigrams if they exist in the cybercat db.
         """
         # bigrams
@@ -205,57 +208,113 @@ class CollocationAttestor:
         query_result = self.execute_query(query).fetchall()
         return query_result
 
-    def get_collocation_stats(self, collocations,
-                              pmi=True,t_score=True,
-                              ngram_freq=True, doc_freq=True):
-        if len(collocations) <= 0:
+    def get_collocation_stats(self, ngrams: List[str],
+                              include_pmi=True, include_t_score=True,
+                              include_ngram_freq=True):
+        """Get the frequency and/or collocationability metrics for a list of
+        collocations.
+
+        :param ngrams: The ngrams for which stats should be returned.
+            Note: All ngrams must contain the same amount of tokens.
+            Ex. ['что делать', 'рассматривать дело', 'новый метод']
+        :param include_pmi: Get the PMI score of all ngrams. Default: True.
+        :param include_t_score: Get the t-score of all ngrams. Default: True.
+        :param include_ngram_freq: Get the frequencies of all ngrams. Default: True.
+        :return A dictionary where key is the collocation and value is a dictionary
+            containing the included metrics {'pmi', 't_score', 'ngram_freq'}.
+        """
+        if len(ngrams) <= 0:
             return []
 
         # Check if bigram or trigram
         bigrams = True
-        if len(collocations[0]) > 2:
+        if len(" ".split(ngrams[0])) <= 0:
             bigrams = False
 
-        patterns = []
-        last_words = []
-        pattern_dict = {}
-        last_word_dict = {}
+        # Initialize the ngram stats dictionary to return
+        stats = {}
 
-        for collocation in collocations:
-            # Get the pattern, aka the first n-1 tokens in an n-gram
-            if bigrams:
-                pattern = collocation[0]
-            else:
-                pattern = " ".join(collocation[:2])
-            patterns.append(pattern)
-            pattern_dict[pattern] = 0
-
-            last_word = collocation[-1]
-            last_words.append(last_word)
-            last_word_dict[last_word] = 0
-
-        # Get the frequencies for patterns
-        if bigrams:
-            for row in self.get_frequency(patterns):
-                pattern = row[0]
-                frequency = row[1]
-                pattern_dict[pattern] = frequency
-        else:
-            for row in self.get_frequency(patterns):
-                pattern = row[0]
-                frequency = row[1]
-                pattern_dict[pattern] = frequency
-
-        # Get the frequencies for last_words
-        for row in self.get_frequency(last_words):
-            last_word = row[0]
-            frequency = row[1]
-            last_word_dict[last_word] = frequency
+        # Load the frequencies for collocations
+        for ngram, frequency in self.get_frequency(ngrams):
+            stats[ngram] = {}
+            if include_ngram_freq:
+                stats[ngram]["ngram_freq"] = frequency
 
         # Calculate the pmi and t-scores
-        if pmi or t_score:
-            for collocation in collocations:
-                pass
+        if include_pmi or include_t_score:
+            uncached_collocations = set()
 
-        # Return the selected stats
-        pass
+            # Get the pmi and/or t_score for cached collocations
+            for ngram in ngrams:
+                if include_pmi:
+                    if "pmi" not in CollocationAttestor.collocation_stats[ngram]:
+                        uncached_collocations.add(ngram)
+                    else:
+                        stats[ngram]["pmi"] = CollocationAttestor.collocation_stats[ngram]["pmi"]
+                if include_t_score:
+                    if "t_score" not in CollocationAttestor.collocation_stats[ngram]:
+                        uncached_collocations.add(ngram)
+                    else:
+                        stats[ngram]["t_score"] = CollocationAttestor.collocation_stats[ngram]["t_score"]
+
+            # Get the pmi and/or t_score for uncached collocations
+            if len(uncached_collocations) > 0:
+                # Prepare the necessary information for calculating pmi and t_score
+                patterns = []
+                last_words = []
+                pattern_dict = {}
+                last_word_dict = {}
+
+                for ngram in uncached_collocations:
+                    split_collocation = ngram.split(" ")
+                    # Get the pattern, aka the first n-1 tokens in an n-gram
+                    if bigrams:
+                        pattern = split_collocation[0]
+                    else:
+                        pattern = " ".join(split_collocation[:2])
+                    patterns.append(pattern)
+                    pattern_dict[pattern] = 0
+
+                    last_word = split_collocation[-1]
+                    last_words.append(last_word)
+                    last_word_dict[last_word] = 0
+
+                # Get the frequencies for patterns
+                if bigrams:
+                    for row in self.get_frequency(patterns):
+                        pattern = row[0]
+                        frequency = row[1]
+                        pattern_dict[pattern] = frequency
+                else:
+                    for row in self.get_frequency(patterns):
+                        pattern = row[0]
+                        frequency = row[1]
+                        pattern_dict[pattern] = frequency
+
+                # Get the frequencies for last_words
+                for row in self.get_frequency(last_words):
+                    last_word = row[0]
+                    frequency = row[1]
+                    last_word_dict[last_word] = frequency
+
+                for ngram in uncached_collocations:
+                    split_collocation = ngram.split(" ")
+                    if bigrams:
+                        pattern = split_collocation[0]
+                    else:
+                        pattern = " ".join(split_collocation[:2])
+                    last_word = split_collocation[-1]
+
+                    colloc_count = CollocationAttestor.collocation_stats[ngram]["freq"]
+                    c_pattern = pattern_dict[pattern]
+                    c_lw = last_word_dict[last_word]
+
+                    if include_pmi:
+                        pmi_value = pmi(colloc_count, c_pattern, c_lw, self.get_domain_size())
+                        CollocationAttestor.collocation_stats[ngram]["pmi"] = pmi_value
+                        stats[ngram]["pmi"] = pmi_value
+                    if include_t_score:
+                        t_score_value = t_score(colloc_count, c_pattern, c_lw, self.get_domain_size())
+                        CollocationAttestor.collocation_stats[ngram]["t_score"] = t_score_value
+                        stats[ngram]["t_score"] = t_score_value
+        return stats
