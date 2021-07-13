@@ -36,8 +36,8 @@ class CollocationAttestor:
     """
 
     # Cache to avoid redundant db queries
-    domain_size = -1
-    collocation_stats = {}
+    _domain_size = -1
+    _collocation_stats = {}
 
     def __init__(self, domain=DOMAIN, host=HOST, user=USER, password=PWD):
         """Opens a connection with the cybercat database.
@@ -60,7 +60,7 @@ class CollocationAttestor:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.connection.close()
 
-    def execute_query(self, query: str):
+    def _execute_query(self, query: str):
         """Manages the context of a cursor to execute a query to the cybercat db.
 
         :param query: The SQL query as a string.
@@ -71,15 +71,15 @@ class CollocationAttestor:
 
     def get_domain_size(self):
         """Returns the amount of lemmas in the cybercat corpus."""
-        if CollocationAttestor.domain_size == -1:
-            query_result = self.execute_query(
+        if CollocationAttestor._domain_size == -1:
+            query_result = self._execute_query(
                 """
                 SELECT COUNT(distinct lemma)
                 FROM cybercat.lemmas;
                 """
             ).fetchone()
-            CollocationAttestor.domain_size = query_result[0]
-        return CollocationAttestor.domain_size
+            CollocationAttestor._domain_size = query_result[0]
+        return CollocationAttestor._domain_size
 
     def get_frequency(self, ngrams: List[str]):
         """Returns the frequency of one or more lemmatized ngrams in the cybercat db.
@@ -93,12 +93,12 @@ class CollocationAttestor:
             return []
         n = len(ngrams[0].split(" "))
         uncached_ngrams= [ngram for ngram in ngrams
-                           if ngram not in CollocationAttestor.collocation_stats]
+                          if ngram not in CollocationAttestor._collocation_stats]
 
         # Get the frequencies for uncached ngrams
         if len(uncached_ngrams) > 0:
             if n == 1:
-                query_result = self.execute_query(
+                query_result = self._execute_query(
                     """
                     SELECT lemmas.lemma, SUM(uni.freq_all)
                     FROM
@@ -111,7 +111,7 @@ class CollocationAttestor:
                     """.format("','".join(uncached_ngrams))
                 ).fetchall()
             elif n == 2:
-                query_result = self.execute_query(
+                query_result = self._execute_query(
                     """
                     SELECT CONCAT(l1.lemma, " ", l2.lemma) as "bigram", SUM(bi_lemma.raw_frequency) as "frequency"
                     FROM 
@@ -127,7 +127,7 @@ class CollocationAttestor:
                     """.format("','".join(uncached_ngrams))
                 ).fetchall()
             elif n == 3:
-                query_result = self.execute_query(
+                query_result = self._execute_query(
                     """
                     SELECT CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma) as "trigram", SUM(tokens.raw_frequency) as "frequency"
                     FROM
@@ -149,19 +149,19 @@ class CollocationAttestor:
             for row in query_result:
                 lemma = row[0]
                 frequency = row[1]
-                CollocationAttestor.collocation_stats[lemma]= {}
-                CollocationAttestor.collocation_stats[lemma]["freq"] = frequency
+                CollocationAttestor._collocation_stats[lemma]= {}
+                CollocationAttestor._collocation_stats[lemma]["freq"] = frequency
 
             # Set frequency of unattested ngrams to 0
             for ngram in uncached_ngrams:
-                if ngram not in CollocationAttestor.collocation_stats:
-                    CollocationAttestor.collocation_stats[ngram] = {}
-                    CollocationAttestor.collocation_stats[ngram]["freq"] = 0
+                if ngram not in CollocationAttestor._collocation_stats:
+                    CollocationAttestor._collocation_stats[ngram] = {}
+                    CollocationAttestor._collocation_stats[ngram]["freq"] = 0
 
         # Return the frequencies of the inputted ngrams
         frequencies = []
         for ngram in ngrams :
-            frequencies.append([ngram, CollocationAttestor.collocation_stats[ngram]["freq"]])
+            frequencies.append([ngram, CollocationAttestor._collocation_stats[ngram]["freq"]])
         return frequencies
 
     def attest_collocations(self, lemmas: List[List[str]]):
@@ -205,7 +205,7 @@ class CollocationAttestor:
             logging.error("Error: Can filter results for 2-grams or 3-grams only")
             return []
 
-        query_result = self.execute_query(query).fetchall()
+        query_result = self._execute_query(query).fetchall()
         return query_result
 
     def get_collocation_stats(self, ngrams: List[str],
@@ -247,15 +247,15 @@ class CollocationAttestor:
             # Get the pmi and/or t_score for cached collocations
             for ngram in ngrams:
                 if include_pmi:
-                    if "pmi" not in CollocationAttestor.collocation_stats[ngram]:
+                    if "pmi" not in CollocationAttestor._collocation_stats[ngram]:
                         uncached_collocations.add(ngram)
                     else:
-                        stats[ngram]["pmi"] = CollocationAttestor.collocation_stats[ngram]["pmi"]
+                        stats[ngram]["pmi"] = CollocationAttestor._collocation_stats[ngram]["pmi"]
                 if include_t_score:
-                    if "t_score" not in CollocationAttestor.collocation_stats[ngram]:
+                    if "t_score" not in CollocationAttestor._collocation_stats[ngram]:
                         uncached_collocations.add(ngram)
                     else:
-                        stats[ngram]["t_score"] = CollocationAttestor.collocation_stats[ngram]["t_score"]
+                        stats[ngram]["t_score"] = CollocationAttestor._collocation_stats[ngram]["t_score"]
 
             # Get the pmi and/or t_score for uncached collocations
             if len(uncached_collocations) > 0:
@@ -305,16 +305,16 @@ class CollocationAttestor:
                         pattern = " ".join(split_collocation[:2])
                     last_word = split_collocation[-1]
 
-                    colloc_count = CollocationAttestor.collocation_stats[ngram]["freq"]
+                    colloc_count = CollocationAttestor._collocation_stats[ngram]["freq"]
                     c_pattern = pattern_dict[pattern]
                     c_lw = last_word_dict[last_word]
 
                     if include_pmi:
                         pmi_value = pmi(colloc_count, c_pattern, c_lw, self.get_domain_size())
-                        CollocationAttestor.collocation_stats[ngram]["pmi"] = pmi_value
+                        CollocationAttestor._collocation_stats[ngram]["pmi"] = pmi_value
                         stats[ngram]["pmi"] = pmi_value
                     if include_t_score:
                         t_score_value = t_score(colloc_count, c_pattern, c_lw, self.get_domain_size())
-                        CollocationAttestor.collocation_stats[ngram]["t_score"] = t_score_value
+                        CollocationAttestor._collocation_stats[ngram]["t_score"] = t_score_value
                         stats[ngram]["t_score"] = t_score_value
         return stats
