@@ -30,12 +30,22 @@ PWD = config['SERVER']['PWD']
 
 
 class StaticEmbedder():
+    """The class for suggesting collocation via static word embeddings.
+    """
+
     class Model(Enum):
+        """ The type of static word embeddings to use.
+        """
         WORD2VEC = 1
         FASTTEXT = 2
         GLOVE = 3
 
     def __init__(self, model_type, src: str):
+        """Initialize the embedding model.
+
+        :param model_type: The type of embeddings to use.
+        :param src: The path to the location of the word embedding model.
+        """
         self.model_type = model_type
         self.model = self.load_model(src)
 
@@ -52,6 +62,17 @@ class StaticEmbedder():
 
     def suggest_collocations(self, ngram_tokens: List[str], fixed_positions: List[int],
                              topn=10, cossim = True) -> List[Tuple[str, int, float]]:
+        """Return a ranked list of collocations from a input sentence with fixed positions.
+
+        :param ngram_tokens: A list of tokens with pos tags, forming the input sentence.
+            ex. ["рассматривать_", "школа_N", "экономика_N"]
+        :param fixed_positions: The tokens that will not be replaced.
+            ex. [1, 0, 1] to only replace "школа"
+        :param topn: The amount of tokens to suggest for each masked token.
+        :param cossim: The similarity measure to use: True for cossim, False for cosmul. Default: cossim.
+        :return a ranked list of suggested collocations.
+            ex. [("рассматривать потребность экономика", 2, 0.123), ("рассматривать университет экономика", 6, 0.678)]
+        """
         # Filter out the tokens for which replacements will be suggested
         if len(ngram_tokens) != len(fixed_positions):
             logging.error(f"Length of ngram_tokens ({len(ngram_tokens)}) is not equal to length of fixed_positions ({len(fixed_positions)})")
@@ -94,6 +115,7 @@ class StaticEmbedder():
                         if token[1][1] == pos_tag
                 ])
 
+        # Flatten out the suggested_replacements list to format (colloc, rank)
         suggested_collocations = []
         for colloc_tuple in product(*suggested_replacements):
             colloc = []

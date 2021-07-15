@@ -30,10 +30,20 @@ PWD = config['SERVER']['PWD']
 
 
 class DynamicEmbedder():
+    """The class for suggesting collocation via dynamic word embeddings.
+    """
+
     class Model(Enum):
+        """ The type of dynamicword embeddings to use.
+        """
         BERT = 1
 
     def __init__(self, model_type, src: str):
+        """Initialize the embedding model.
+
+        :param model_type: The type of embeddings to use.
+        :param src: The path to the location of the word embedding model.
+        """
         self.model_type = model_type
         self.model = self.load_model(src)
 
@@ -46,6 +56,16 @@ class DynamicEmbedder():
             raise NotImplementedError
 
     def suggest_collocations(self, masked_ngram: str, topn: int = 10) -> List[Tuple[str, int]]:
+        """Return a ranked list of collocations from a input sentence with masked tokens.
+
+        :param masked_ngram: The input sentence with masked tokens.
+            ex. "рассматривать_V <mask>_N экономика_N" (model trained w/ pos tags) or
+                "рассматривать <mask> <mask>" (model trained w/o pos tags)
+        :param topn: The amount of tokens to suggest for each masked token.
+        :return a ranked list of suggested collocations.
+            ex. [("рассматривать школа экономика", 3), ("рассматривать потребность экономика", 5)] (model trained w/ pos tags)or
+            [("рассматривать школу экономики", 3), ("рассматривать потребность экономики", 5)] (model trained w/o pos tags)
+        """
         # https://discuss.huggingface.co/t/having-multiple-mask-tokens-in-a-sentence/3493
         if self.model_type == self.Model.BERT:
             token_ids = self.tokenizer.encode(masked_ngram, return_tensors='pt')
@@ -73,7 +93,7 @@ class DynamicEmbedder():
                 else:
                     suggested_replacements.insert(idx, tuple(0, token))
 
-            # Flatten out the suggested_replacements list
+            # Flatten out the suggested_replacements list to format (colloc, rank)
             suggested_collocations = []
             for colloc_tuple in product(*suggested_replacements):
                 colloc = []
