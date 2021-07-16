@@ -17,6 +17,7 @@ path_config_file = os.path.join(path_current_directory, '../',
                                 'config.ini')
 config = configparser.ConfigParser()
 config.read(path_config_file)
+models_dir = config['PATHS']['models_dir']
 log_dir = config['PATHS']['log_dir']
 log_file = str(Path(log_dir, 'tokenize.txt'))
 logging.basicConfig(handlers=[logging.FileHandler(log_file, 'a', 'utf-8')],
@@ -49,12 +50,15 @@ class Tokenizer:
         self.method = method
         if self.method == self.Method.TREETAGGER:
             if Tokenizer.tagger is None:
-                Tokenizer.tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR='.')
+                Tokenizer.tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR=str(Path(models_dir)))
             if Tokenizer.tag_table is None:
-                Tokenizer.tag_table = pandas.read_table('ru-table.tab')
+                Tokenizer.tag_table = pandas.read_table(str(Path(models_dir, 'ru-table.tab')))
         elif self.method == self.Method.UDPIPE:
             if Tokenizer.process_pipeline is None:
                 Tokenizer.process_pipeline = kutuzov.load_model()
+        else:
+            logging.error("Can only tokenize via treetagger, udpipe, or mystem")
+            raise
 
     def tokenize(self, sentences: Iterable[str], keep_pos: bool = True,
                  keep_punct: bool = False) -> List[str]:
@@ -97,6 +101,7 @@ class Tokenizer:
             elif self.method is self.Method.MYSTEM:
                 raise NotImplementedError
             else:
+                logging.error("Can only tokenize via treetagger, udpipe, or mystem")
                 raise NotImplementedError
         return ret
 
