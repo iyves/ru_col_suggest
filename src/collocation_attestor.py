@@ -56,6 +56,7 @@ class CollocationAttestor:
         to the cybercat db.
         """
         self.connection = mysql.connector.connect(host=HOST, database=DOMAIN, user=USER, password=PWD)
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.connection.close()
@@ -67,7 +68,9 @@ class CollocationAttestor:
         :return The results of the query.
         """
         with self.connection.cursor() as cursor:
-            return cursor.execute(query)
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
 
     def get_domain_size(self):
         """Returns the amount of lemmas in the cybercat corpus."""
@@ -77,8 +80,8 @@ class CollocationAttestor:
                 SELECT COUNT(distinct lemma)
                 FROM cybercat.lemmas;
                 """
-            ).fetchone()
-            CollocationAttestor._domain_size = query_result[0]
+            )
+            CollocationAttestor._domain_size = query_result[0][0]
         return CollocationAttestor._domain_size
 
     def get_frequency(self, ngrams: List[str]):
@@ -104,12 +107,12 @@ class CollocationAttestor:
                     FROM
                         (SELECT id_lemmas, lemma 
                         FROM cybercat.lemmas
-                        WHERE lemma in ('{}')
+                        WHERE hex(lemma) in (hex('{}'))
                         ) as lemmas
                     LEFT JOIN cybercat.unigrams as uni ON uni.lemma = lemmas.id_lemmas
                     GROUP BY lemmas.lemma;
-                    """.format("','".join(uncached_ngrams))
-                ).fetchall()
+                    """.format("'), hex('".join(uncached_ngrams))
+                )
             elif n == 2:
                 query_result = self._execute_query(
                     """
@@ -122,10 +125,10 @@ class CollocationAttestor:
                         ) as bi_lemma
                     LEFT JOIN cybercat.lemmas l1 ON bi_lemma.lemma1 = l1.id_lemmas
                     LEFT JOIN cybercat.lemmas l2 ON bi_lemma.lemma2 = l2.id_lemmas
-                    WHERE CONCAT(l1.lemma, " ", l2.lemma) in ('{}')
+                    WHERE hex(CONCAT(l1.lemma, " ", l2.lemma)) in (hex('{}'))
                     GROUP BY CONCAT(l1.lemma, " ", l2.lemma);
-                    """.format("','".join(uncached_ngrams))
-                ).fetchall()
+                    """.format("'), hex('".join(uncached_ngrams))
+                )
             elif n == 3:
                 query_result = self._execute_query(
                     """
@@ -138,10 +141,10 @@ class CollocationAttestor:
                     LEFT JOIN cybercat.lemmas l1 ON tokens.t1 = l1.id_lemmas
                     LEFT JOIN cybercat.lemmas l2 ON tokens.t2 = l2.id_lemmas
                     LEFT JOIN cybercat.lemmas l3 ON tokens.t3 = l3.id_lemmas
-                    WHERE CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma) in ('{}')
+                    WHERE hex(CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma)) in (hex('{}'))
                     GROUP BY CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma);
-                    """.format("','".join(uncached_ngrams))
-                ).fetchall()
+                    """.format("'), hex('".join(uncached_ngrams))
+                )
             else:
                 logging.error("Can only get frequencies of 1/2/3-grams!")
                 return []
@@ -150,7 +153,7 @@ class CollocationAttestor:
                 lemma = row[0]
                 frequency = row[1]
                 CollocationAttestor._collocation_stats[lemma]= {}
-                CollocationAttestor._collocation_stats[lemma]["freq"] = frequency
+                CollocationAttestor._collocation_stats[lemma]["freq"] = int(frequency)
 
             # Set frequency of unattested ngrams to 0
             for ngram in uncached_ngrams:
@@ -169,7 +172,7 @@ class CollocationAttestor:
         trigrams.
 
         :param lemmas: Two lists (bigrams) or three lists (trigrams) of tokens
-            to attest. Ex. [['мочь']], [['быть', 'делать']] for 'моч быть' and 'мочь делать'
+            to attest. Ex. [['мочь']], [['быть', 'делать']] for 'мочь быть' and 'мочь делать'
             or [['рассматривать'], ['потребность', 'школа'] ['экономика']] for
             'рассматривать потребность экономика' and 'рассматривать школа экономика'.
         :return The lemmatized bigrams or trigrams if they exist in the cybercat db.
@@ -202,11 +205,11 @@ class CollocationAttestor:
             WHERE l1.lemma in ('{}') AND l2.lemma IN ('{}') AND l3.lemma IN ('{}');
             """.format("','".join(lemmas[0]), "','".join(lemmas[1]), "','".join(lemmas[2]))
         else:
-            logging.error("Error: Can filter results for 2-grams or 3-grams only")
+            logging.error("Error: Can attest 2-grams or 3-grams only")
             return []
 
-        query_result = self._execute_query(query).fetchall()
-        return query_result
+        query_result = self._execute_query(query)
+        return [" ".join(result) for result in query_result]
 
     def get_collocation_stats(self, ngrams: List[str],
                               include_pmi=True, include_t_score=True,
