@@ -89,7 +89,7 @@ class StaticEmbedder():
         elif self.model_type == self.Model.FASTTEXT:
             # No extra work to do for fastText model
             for token in tokens_to_replace:
-                if token not in self.model.wv.key_to_index:
+                if token not in self.model.wv.vocab:
                     logging.info(f"'{token}' not in model vocabulary.")
         else:
             logging.error("Can suggest collocations for only w2v, fasttext, or glove models.")
