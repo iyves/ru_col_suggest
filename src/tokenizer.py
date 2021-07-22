@@ -55,7 +55,7 @@ class Tokenizer:
                 Tokenizer.tag_table = pandas.read_table(str(Path(models_dir, 'ru-table.tab')))
         elif self.method == self.Method.UDPIPE:
             if Tokenizer.process_pipeline is None:
-                Tokenizer.process_pipeline = kutuzov.load_model()
+                Tokenizer.model, Tokenizer.process_pipeline = kutuzov.load_model()
         else:
             logging.error("Can only tokenize via treetagger, udpipe, or mystem")
             raise

@@ -250,4 +250,4 @@ def load_model():
     print('\nLoading the model from {}...'.format(model_path), file=sys.stderr)
     model = Model.load(model_path)
     process_pipeline = Pipeline(model, 'tokenize', Pipeline.DEFAULT, Pipeline.DEFAULT, 'conllu')
-    return process_pipeline
+    return model, process_pipeline
