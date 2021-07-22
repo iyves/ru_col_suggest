@@ -91,16 +91,16 @@ class DynamicEmbedder():
                 if "mask" in token:
                     continue
                 else:
-                    suggested_replacements.insert(idx, tuple(0, token))
+                    suggested_replacements.insert(idx, (0, token))
 
             # Flatten out the suggested_replacements list to format (colloc, rank)
             suggested_collocations = []
             for colloc_tuple in product(*suggested_replacements):
                 colloc = []
                 rank = 0
-                for tuple in colloc_tuple:
-                    colloc.append(tuple[0])
-                    rank += tuple[1]
+                for tup in colloc_tuple:
+                    colloc.append(tup[0])
+                    rank += tup[1]
                 suggested_collocations.append((" ".join(colloc), rank))
             return suggested_collocations
         else:

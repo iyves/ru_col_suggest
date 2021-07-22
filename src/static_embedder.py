@@ -65,7 +65,7 @@ class StaticEmbedder():
         """Return a ranked list of collocations from a input sentence with fixed positions.
 
         :param ngram_tokens: A list of tokens with pos tags, forming the input sentence.
-            ex. ["рассматривать_", "школа_N", "экономика_N"]
+            ex. ["рассматривать_V", "школа_N", "экономика_N"]
         :param fixed_positions: The tokens that will not be replaced.
             ex. [1, 0, 1] to only replace "школа"
         :param topn: The amount of tokens to suggest for each masked token.
@@ -106,7 +106,7 @@ class StaticEmbedder():
         suggested_replacements = []
         for ngram, fixed in zip(ngram_tokens, fixed_positions):
             if fixed == 1:
-                suggested_replacements.append([tuple(ngram.split("_")[0], 0, 0)])
+                suggested_replacements.append([(ngram.split("_")[0], 0, 0)])
             else:
                 # Get the similar words in format (token, pos tag, cosine distance)
                 pos_tag = ngram.split("_")[1]
