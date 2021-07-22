@@ -49,13 +49,19 @@ class StaticEmbedder():
         self.model_type = model_type
         self.model = self.load_model(src)
 
-    def load_model(self, src: str):
+    def load_model(self, src: str, binary=True):
+        """Load the static word embedding model from the src path.
+
+        :param src: The path of the word embedding model file (usually ending in .model or .txt)
+        :param binary: Only relevant for GloVe embeddings. True for loading from a .model, else .txt. Default: True.
+        :return the loaded model.
+        """
         if self.model_type == self.Model.WORD2VEC:
             return Word2Vec.load(src)
         elif self.model_type == self.Model.FASTTEXT:
             return FastText.load(src)
         elif self.model_type == self.Model.GLOVE:
-            return KeyedVectors.load_word2vec_format(src, binary=True, unicode_errors='ignore')
+            return KeyedVectors.load_word2vec_format(src, binary=binary, unicode_errors='ignore')
         else:
             logging.error("Can only load w2v, fasttext, or glove models.")
             raise NotImplementedError
