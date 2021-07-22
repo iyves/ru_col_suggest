@@ -121,9 +121,9 @@ class StaticEmbedder():
             colloc = []
             rank = 0
             cosine = 0
-            for tuple in colloc_tuple:
-                colloc.append(tuple[0])
-                rank += tuple[1]
-                cosine += tuple[2]
+            for tup in colloc_tuple:
+                colloc.append(tup[0])
+                rank += tup[1]
+                cosine += tup[2]
             suggested_collocations.append((" ".join(colloc), rank, cosine))
         return suggested_collocations
