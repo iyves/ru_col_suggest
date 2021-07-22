@@ -13,6 +13,9 @@ from src.scripts.colloc import pmi, t_score
 from typing import Iterable, List, Optional, Tuple
 
 
+# For avoiding divide by zero errors
+MINIMUM = .000000000001
+
 # Set up the configuration
 path_current_directory = os.path.dirname(__file__)
 path_config_file = os.path.join(path_current_directory, '../',
@@ -227,12 +230,17 @@ class CollocationAttestor:
             containing the included metrics {'pmi', 't_score', 'ngram_freq'}.
         """
         if len(ngrams) <= 0:
-            return []
+            return {}
 
         # Check if bigram or trigram
-        bigrams = True
-        if len(" ".split(ngrams[0])) <= 0:
+        gram = len(ngrams[0].split(" "))
+        if gram == 2:
+            bigrams = True
+        elif gram == 3:
             bigrams = False
+        else:
+            logging.error("Can only get stats for 2/3-grams!")
+            return {}
 
         # Initialize the ngram stats dictionary to return
         stats = {}
@@ -311,6 +319,14 @@ class CollocationAttestor:
                     colloc_count = CollocationAttestor._collocation_stats[ngram]["freq"]
                     c_pattern = pattern_dict[pattern]
                     c_lw = last_word_dict[last_word]
+
+                    # Avoid divide by zero
+                    if colloc_count == 0:
+                        colloc_count = MINIMUM
+                    if c_pattern == 0:
+                        c_pattern = MINIMUM
+                    if c_lw == 0:
+                        c_lw = MINIMUM
 
                     if include_pmi:
                         pmi_value = pmi(colloc_count, c_pattern, c_lw, self.get_domain_size())

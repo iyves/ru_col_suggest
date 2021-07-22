@@ -122,6 +122,44 @@ class TestCollocationAttestor:
             assert attestor.connection is not None
             assert len(attestor.attest_collocations(input)) == 0
 
-    # 	- get the colloc stats for empty list
-    # 	- get collocation stats (frequency) for bigrams, trigrams, 4-grams
-    # 	- do the same, to make sure the cache exists for stats
+    def test_GetStatsEmptyList_ShouldReturnEmptyDictionary(self):
+        with CollocationAttestor() as attestor:
+            assert attestor is not None
+            assert attestor.connection is not None
+            stats = attestor.get_collocation_stats([])
+            assert isinstance(stats, dict)
+            assert len(stats) == 0
+
+    @pytest.mark.parametrize('input', [
+        (['что', 'это']),
+        (['раз два три четыре'])
+    ])
+    def test_GetStatsNonbitrigram_ShouldReturnEmptyDictionary(self, input):
+        with CollocationAttestor() as attestor:
+            assert attestor is not None
+            assert attestor.connection is not None
+            stats = attestor.get_collocation_stats([])
+            assert isinstance(stats, dict)
+            assert len(stats) == 0
+
+    @pytest.mark.parametrize('input,expected_outcome', [
+        (['что делать'], [0]),
+        (['рассматривать школа экономика'], [0])
+    ])
+    def test_GetStatsExistingCollocations_ShouldStats(self, input, expected_outcome):
+        with CollocationAttestor() as attestor:
+            assert attestor is not None
+            assert attestor.connection is not None
+            stats = attestor.get_collocation_stats(input)
+            assert isinstance(stats, dict)
+            for collocation in input:
+                assert collocation in stats
+                assert "pmi" in stats[collocation]
+                assert "t_score" in stats[collocation]
+                assert "ngram_freq" in stats[collocation]
+                # Checking the cache
+                assert collocation in attestor._collocation_stats
+                assert "freq" in attestor._collocation_stats[collocation]
+                assert "t_score" in attestor._collocation_stats[collocation]
+                assert "pmi" in attestor._collocation_stats[collocation]
+                # TODO: make sure the pmi and t-score calculations are correct
