@@ -40,22 +40,17 @@ class StaticEmbedder():
         FASTTEXT = 2
         GLOVE = 3
 
-    def __init__(self, model_type, src: str):
+    def __init__(self, model_type, src: str, binary=True):
         """Initialize the embedding model.
 
         :param model_type: The type of embeddings to use.
         :param src: The path to the location of the word embedding model.
+        :param binary: Only relevant for GloVe embeddings. True for loading from a .model, else .txt. Default: True.
         """
         self.model_type = model_type
-        self.model = self.load_model(src)
+        self.model = self.load_model(src, binary=binary)
 
     def load_model(self, src: str, binary=True):
-        """Load the static word embedding model from the src path.
-
-        :param src: The path of the word embedding model file (usually ending in .model or .txt)
-        :param binary: Only relevant for GloVe embeddings. True for loading from a .model, else .txt. Default: True.
-        :return the loaded model.
-        """
         if self.model_type == self.Model.WORD2VEC:
             return Word2Vec.load(src)
         elif self.model_type == self.Model.FASTTEXT:
