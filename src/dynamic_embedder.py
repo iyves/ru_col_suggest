@@ -45,7 +45,7 @@ class DynamicEmbedder():
         :param src: The path to the location of the word embedding model.
         """
         self.model_type = model_type
-        self.model = self.load_model(src)
+        self.load_model(src)
 
     def load_model(self, src: str):
         if self.model_type == self.Model.BERT:
