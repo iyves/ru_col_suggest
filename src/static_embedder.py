@@ -7,6 +7,7 @@ import sys
 
 from enum import Enum
 from gensim.models import FastText, KeyedVectors, Word2Vec
+from gensim.models.callbacks import CallbackAny2Vec
 from itertools import product
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
@@ -39,6 +40,22 @@ class StaticEmbedder():
         WORD2VEC = 1
         FASTTEXT = 2
         GLOVE = 3
+
+    class LossLogger(CallbackAny2Vec):
+        '''Class created in training for tracking output loss at each epoch.'''
+
+        def __init__(self):
+            self.epoch = 1
+            self.losses = []
+
+        def on_epoch_begin(self, model):
+            print(f'Epoch: {self.epoch}', end='\t')
+
+        def on_epoch_end(self, model):
+            loss = model.get_latest_training_loss()
+            self.losses.append(loss)
+            print(f'  Loss: {loss}')
+            self.epoch += 1
 
     def __init__(self, model_type, src: str, binary=True):
         """Initialize the embedding model.
@@ -113,7 +130,7 @@ class StaticEmbedder():
                 pos_tag = ngram.split("_")[1]
                 suggested_replacements.append([
                     (token[1][0], token[0], token[1][2]) for token in similar_words
-                        if token[1][1] == pos_tag
+                        if token[1][1] == pos_tag and len(token[1]) == 3
                 ])
 
         # Flatten out the suggested_replacements list to format (colloc, rank)
