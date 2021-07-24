@@ -31,7 +31,16 @@ USER = config['SERVER']['USER']
 PWD = config['SERVER']['PWD']
 
 
-def getPosMask(n, replaceAmt):
+def getPosMask(n: int, replaceAmt: int):
+    """Auxiliary function for StaticModels. Generates the PoS masks used for
+    deciding which words in a given ngram for which suggested replacements
+    will be found.
+
+    :param n: 2 for bigrams, 3 for trigrams.
+    :param replaceAmt: The amount of unfixed tokens.
+        Ex. 1 for replacing only one word; 2 for replacing two words
+    :return the PoS masks for the ngram.
+    """
     if replaceAmt == 1:
         if n == 2:
             return [[0, 1], [1, 0]]
@@ -51,7 +60,21 @@ def getPosMask(n, replaceAmt):
         return []
 
 
-def getMasked(tokens, n, replaceAmt, pos, mask):
+def getMasked(tokens: List[str], n: int, replaceAmt: int, pos: bool, mask: str):
+    """Auxiliary function for DynamicModels. Masks replaceAmt tokens in the
+    given input. The DynamicModel will then find suggested replacements for
+    these masked tokens.
+
+    :param tokens: A list of tokens or token_pos corresponding to the ngram.
+        ex. ['прийти_v', 'к_p', 'вывод_n']
+    :param n: 2 for bigrams, 3 for trigrams.
+    :param replaceAmt: The amount of unfixed tokens.
+        Ex. 1 for replacing only one word; 2 for replacing two words
+    :param pos: Flag denoting the existence of PoS tags in the tokens.
+        ex. 'прийти_v'
+    :param mask: The mask token used when training the DynamicModel.
+    :return a list of collocations with replaceAmt masks.
+    """
     ret = []
     if pos:
         token_pos = [token.split("_")[1] if len(token.split("_")) == 2 else "n"
@@ -103,7 +126,19 @@ def getMasked(tokens, n, replaceAmt, pos, mask):
     return ret
 
 
-def getCollocationComponents(collocations, n, pos):
+def getCollocationComponents(collocations: List[str], n: int, pos: bool):
+    """Auxiliary function for transforming a list of collocations into a format
+    appropriate for the attest_collocations function.
+
+    :param collocations: A list of collocations to break into components.
+        Note: All collocations must comprise of the same number of tokens.
+    :param n: 2 for bigrams, 3 for trigrams.
+    :param pos: Flag denoting the existence of PoS tags in the tokens.
+        ex. 'прийти_v'
+    :return A list of n lists of strings, where each list is the unique set of
+        tokens for the corresponding ngram position.
+        ex. ["прийти к вывод", "прийти к заключение"] -> [["прийти"], ["к"] ,["вывод", "заключение"]]
+    """
     components = []
     if n == 2:
         components.extend([set(), set()])
@@ -121,9 +156,45 @@ def getCollocationComponents(collocations, n, pos):
     return [list(c) for c in components]
 
 
-def get_collocation_replacements(collocations: List[str], staticModel, modelType, modelSrc, binaryModel=True,
+def get_collocation_replacements(collocations: List[str], staticModel: bool, modelType, modelSrc, binaryModel=True,
                                  cossim=True, mask="<mask>", topn=100, replace1=True, replace2=True, replace3=True,
                                  include_pmi=True, include_t_score=True, include_ngram_freq=True):
+    """Given a list of collocations (lemmatized or not), this function will
+    return a dictionary of attested suggested replacements and associated
+    collocatiability statistics.
+
+    :param collocations: A list of collocations for which replacements will be
+        given.
+    :param staticModel: True if using a StaticEmbedder, else false for DynamicEmbedder.
+    :param modelType: The enum corresponding to the type of model to be used for
+        suggesting collocation replacements. ex. StaticEmbedder.Model.GLOVE
+    :param modelSrc: The path to the embedding model to use.
+    :param binaryModel: Only relevant for GloVe embeddings. True if reading from
+        a .model file, else False if reading from a .txt file.
+    :param cossim: Only relevant for StaticEmbedders. The type of collocation
+        metric to use. True for cossim, else false for cosmul.
+    :param mask: Only relevant for DynamicEmbedders. The mask token used when
+        training the model. Default: "<mask>"
+    :param topn: The amount of collocations the embedding model should suggest.
+        Note: This does not translate to the amount of collocation suggestions
+        this function will return. Default: suggest 100 replacements
+    :param replace1: Find replacements for up to 1 token in each collocation.
+    :param replace2: Find replacements for up to 2 tokens in each collocation.
+    :param replace3: Find replacements for up to 3 tokens in each collocation.
+    :param include_pmi: Calculate the pmi score for attested collocation suggestions.
+    :param include_t_score: Calculate the t-score for attested collocation suggestions.
+    :param include_ngram_freq: Calculate the frequency for the attested collocation suggestions.
+    :return a dictionary of attested collocation suggestions for each given collocation.
+        Ex:
+        {'исследовать_v вопрос_n':
+            [{'suggested': 'анализировать вопрос', 'rank': 0, 'cosScore': 0.5687171816825867, 'numReplaced': 1, 'pmi': -1.9326116004215073, 't_score': -713.0812254264505, 'ngram_freq': 71},
+            {'suggested': 'рассматривать вопрос', 'rank': 1, 'cosScore': 0.5575243234634399, 'numReplaced': 1, 'pmi': -0.8382014019729593, 't_score': -322.48555306741184, 'ngram_freq': 2998},
+        'школа_n экономика_n':
+            [{'suggested': 'учитель экономика', 'rank': 1, 'cosScore': 0.4992271065711975, 'numReplaced': 1, 'pmi': -1.9473737666819497, 't_score': -689.6667862412795, 'ngram_freq': 62},
+            {'suggested': 'учитель экономика', 'rank': 1, 'cosScore': 0.4992271065711975, 'numReplaced': 2, 'pmi': -1.9473737666819497, 't_score': -689.6667862412795, 'ngram_freq': 62}]
+        }
+
+    """
     # Initialize the dictionary to return in format dict[original colloc][new colloc][stat]
     colloc_dict = {colloc: [] for colloc in collocations}
 
