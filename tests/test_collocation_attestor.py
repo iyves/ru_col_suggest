@@ -36,8 +36,8 @@ class TestCollocationAttestor:
         (['что', 'делать'], [914458, 88138]),
         (['что делать'], [3694]),
         (['что делать', 'рассматривать дело'], [3694, 721]),
-        (['рассматривать потребность экономика'], [31]),
-        (['рассматривать потребность экономика', 'рассматривать школа экономика'], [31, 6]),
+        (['по мнение автор'], [1851]),
+        (['по мнение автор', 'по данный тема'], [1851, 187]),
     ])
     def test_GetFrequencyExisting_ShouldReturnCorrectFrequency(self, input, expected_output):
         with CollocationAttestor() as attestor:
@@ -89,10 +89,9 @@ class TestCollocationAttestor:
     @pytest.mark.parametrize('input,expected_output', [
         ([['мочь'],['быть']], ['мочь быть']),
         ([['мочь','что'],['быть','делать']], ['мочь быть','мочь делать','что быть','что делать']),
-        ([['рассматривать'],['школа'],['экономика']], ['рассматривать школа экономика']),
-        ([['рассматривать','регулирование'],['школа','потребность'],['экономика','правопонимание']],
-            ['рассматривать школа экономика', 'рассматривать потребность экономика',
-             'рассматривать потребность правопонимание', 'регулирование школа экономика']),
+        ([['по'], ['мнение'], ['автор']], ['по мнение автор']),
+        ([['рассматривать', 'по'], ['мнение', 'данный'], ['тема', 'автор']],
+         ["по данный тема", "по мнение автор"]),
     ])
     def test_AttestExisting_ShouldAttestAll(self, input, expected_output):
         with CollocationAttestor() as attestor:
@@ -144,7 +143,7 @@ class TestCollocationAttestor:
 
     @pytest.mark.parametrize('input,expected_outcome', [
         (['что делать'], [0]),
-        (['рассматривать школа экономика'], [0])
+        (['по мнение автор'], [0])
     ])
     def test_GetStatsExistingCollocations_ShouldStats(self, input, expected_outcome):
         with CollocationAttestor() as attestor:

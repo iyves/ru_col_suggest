@@ -135,17 +135,23 @@ class CollocationAttestor:
             elif n == 3:
                 query_result = self._execute_query(
                     """
-                    SELECT CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma) as "trigram", SUM(tokens.raw_frequency) as "frequency"
+                    SELECT CONCAT(matches.lemma1, " ", matches.lemma2, " ", matches.lemma3) as trigram, SUM(3g_uni.raw_frequency) as freqency
                     FROM
-                        (SELECT bi.wordform_1 as "t1", bi.wordform_2 as "t2", tri.token as "t3", tri.raw_frequency
-                        FROM cybercat.3grams as tri
-                        LEFT JOIN cybercat.2grams as bi ON bi.id_bigram = tri.bigram
-                        ) as tokens
-                    LEFT JOIN cybercat.lemmas l1 ON tokens.t1 = l1.id_lemmas
-                    LEFT JOIN cybercat.lemmas l2 ON tokens.t2 = l2.id_lemmas
-                    LEFT JOIN cybercat.lemmas l3 ON tokens.t3 = l3.id_lemmas
-                    WHERE hex(CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma)) in (hex('{}'))
-                    GROUP BY CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma);
+                        (SELECT l1.lemma as "lemma1", l2.lemma as "lemma2", l3.lemma as "lemma3", tokens.id_trigram
+                        FROM
+                            (SELECT u1.lemma as t1, u2.lemma as t2, u3.lemma as t3, 3g.id_trigram as id_trigram 
+                            FROM cybercat.3grams_tokens as 3g
+                            LEFT JOIN cybercat.unigrams u1 ON 3g.w1 = u1.id_unigram
+                            LEFT JOIN cybercat.unigrams u2 ON 3g.w2 = u2.id_unigram
+                            LEFT JOIN cybercat.unigrams u3 ON 3g.w3 = u3.id_unigram
+                            ) as tokens
+                        LEFT JOIN cybercat.lemmas l1 ON tokens.t1 = l1.id_lemmas
+                        LEFT JOIN cybercat.lemmas l2 ON tokens.t2 = l2.id_lemmas
+                        LEFT JOIN cybercat.lemmas l3 ON tokens.t3 = l3.id_lemmas
+                        WHERE hex(CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma)) in (hex('{}'))
+                        ) as matches
+                    LEFT JOIN cybercat.3grams 3g_uni ON matches.id_trigram = 3g_uni.id_trigram
+                    GROUP BY CONCAT(matches.lemma1, " ", matches.lemma2, " ", matches.lemma3);
                     """.format("'), hex('".join(uncached_ngrams))
                 )
             else:
@@ -198,9 +204,11 @@ class CollocationAttestor:
             query = """
             SELECT DISTINCT l1.lemma as "lemma1", l2.lemma as "lemma2", l3.lemma as "lemma3"
             FROM
-                (SELECT bi.wordform_1 as "t1", bi.wordform_2 as "t2", tri.token as "t3"
-                FROM cybercat.3grams as tri
-                LEFT JOIN cybercat.2grams as bi ON bi.id_bigram = tri.bigram
+                (SELECT u1.lemma as t1, u2.lemma as t2, u3.lemma as t3
+                FROM cybercat.3grams_tokens as 3g
+                LEFT JOIN cybercat.unigrams u1 ON 3g.w1 = u1.id_unigram
+                LEFT JOIN cybercat.unigrams u2 ON 3g.w2 = u2.id_unigram
+                LEFT JOIN cybercat.unigrams u3 ON 3g.w3 = u3.id_unigram
                 ) as tokens
             LEFT JOIN cybercat.lemmas l1 ON tokens.t1 = l1.id_lemmas
             LEFT JOIN cybercat.lemmas l2 ON tokens.t2 = l2.id_lemmas
