@@ -30,6 +30,23 @@ USER = config['SERVER']['USER']
 PWD = config['SERVER']['PWD']
 
 
+class LossLogger(CallbackAny2Vec):
+    '''Class created in training for tracking output loss at each epoch.'''
+
+    def __init__(self):
+        self.epoch = 1
+        self.losses = []
+
+    def on_epoch_begin(self, model):
+        print(f'Epoch: {self.epoch}', end='\t')
+
+    def on_epoch_end(self, model):
+        loss = model.get_latest_training_loss()
+        self.losses.append(loss)
+        print(f'  Loss: {loss}')
+        self.epoch += 1
+
+
 class StaticEmbedder():
     """The class for suggesting collocation via static word embeddings.
     """
@@ -40,22 +57,6 @@ class StaticEmbedder():
         WORD2VEC = 1
         FASTTEXT = 2
         GLOVE = 3
-
-    class LossLogger(CallbackAny2Vec):
-        '''Class created in training for tracking output loss at each epoch.'''
-
-        def __init__(self):
-            self.epoch = 1
-            self.losses = []
-
-        def on_epoch_begin(self, model):
-            print(f'Epoch: {self.epoch}', end='\t')
-
-        def on_epoch_end(self, model):
-            loss = model.get_latest_training_loss()
-            self.losses.append(loss)
-            print(f'  Loss: {loss}')
-            self.epoch += 1
 
     def __init__(self, model_type, src: str, binary=True):
         """Initialize the embedding model.
