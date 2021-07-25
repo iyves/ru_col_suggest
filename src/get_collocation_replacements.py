@@ -1,11 +1,8 @@
 import configparser
 import logging
-import math
 import os
-import sys
-import torch
+import pandas as pd
 
-from enum import Enum
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
@@ -156,7 +153,7 @@ def getCollocationComponents(collocations: List[str], n: int, pos: bool):
     return [list(c) for c in components]
 
 
-def get_collocation_replacements(collocations: List[str], staticModel: bool, modelType, modelSrc, binaryModel=True,
+def getCollocationReplacements(collocations: List[str], staticModel: bool, modelType, modelSrc, binaryModel=True,
                                  cossim=True, mask="<mask>", topn=100, replace1=True, replace2=True, replace3=True,
                                  include_pmi=True, include_t_score=True, include_ngram_freq=True):
     """Given a list of collocations (lemmatized or not), this function will
@@ -286,3 +283,23 @@ def get_collocation_replacements(collocations: List[str], staticModel: bool, mod
                                         info["ngram_freq"] = stats[s[0]]["ngram_freq"]
                                     colloc_dict[colloc].append(info)
     return colloc_dict
+
+
+def writeResults(collocation_dictionary, save_folder=""):
+    """Write a attested collocation suggestions in the return format of the
+    getCollocationReplacements to a specified folder. Files have the name of
+    the input collocation, with the contents consisting of the suggested
+    collocation and its associated statistics. Files are saved in csv format
+    with ".txt" extension.
+
+    :param collocation_dictionary: A dictionary of input collocations to
+        attested collocation suggestions.
+    :param save_folder: The folder where files will be saved.
+    """
+    if save_folder == "":
+        save_folder = str(Path(log_dir))
+
+    for colloc, suggest_dict in collocation_dictionary.items():
+        save_path = str(Path(save_folder, colloc + ".txt"))
+        df = pd.DataFrame(suggest_dict)
+        df.to_csv(save_path, encoding="utf-8")
