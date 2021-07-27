@@ -39,11 +39,10 @@ models_dir=path/to/ru_col_suggest/src/models
 log_dir=path/to/ru_col_suggest/data/log
 data_dir=path/to/ru_col_suggest/data/
 
-pickles_dir=path/to/ru_col_suggest/data/preprocessed/pickle
 preprocessed_text_dir=path/to/ru_col_suggest/data/preprocessed/text
 
 [SERVER]
-DOMAIN=domain
+DOMAIN=domain (i.e. cybercat)
 HOST=server_ip
 USER=username
 PWD=pwd
@@ -53,12 +52,12 @@ PWD=pwd
 ## Extracting text from pdfs
 In the `src/scripts/extraction` folder there are scripts for two methods of extracting text
 from a pdf document:
-- [Kutuzov's method](https://github.com/rusnlp/rusnlp/blob/033ef738e7791bb60afb398647c3d0512eaff4bc/code/web/backend/preprocessing/pdf_parser/make_txt_from_pdf.py): pdf_to_text.py
-- [PDFBox method](https://pdfbox.apache.org/download.cgi): pdfparse_pdf_box.sh
+- [Kutuzov's method](https://github.com/rusnlp/rusnlp/blob/033ef738e7791bb60afb398647c3d0512eaff4bc/code/web/backend/preprocessing/pdf_parser/make_txt_from_pdf.py): [pdf_to_text.py](src/scripts/extraction/pdf_to_text.py)
+- [PDFBox method](https://pdfbox.apache.org/download.cgi): [parse_pdf_box.sh](src/scripts/extraction/parse_pdf_box.sh)
 
 There is also a python script for checking the text extraction. It confirms whether or not there is
 a matching extracted file for each pdf file.
-- check_parsed_files.py
+- [check_parsed_files.py](src/scripts/extraction/check_parsed_files.py)
 
 Prior to text extraction, pdfs of Russian academic papers must be stored in the 
 `data/pdf` folder.
@@ -125,8 +124,8 @@ There are three methods for preprocessing text. Liza's method was used for prepr
 the cybercat database, whereas the PDFBox method was used for preprocessing text from the CAT database. 
 
 The `src/scripts/preprocessing` folder includes two methods:
-- [Kutuzov's method](https://github.com/akutuzov/webvectors/blob/db517610a5d9b5cb6c5f3fa3c55877c1291c0ec1/preprocessing/rus_preprocessing_udpipe.py): kutuzov/rus_preprocessing_udpipe.py
-- Liza's method: liza/CAT_preprocessing.py
+- [Kutuzov's method](https://github.com/akutuzov/webvectors/blob/db517610a5d9b5cb6c5f3fa3c55877c1291c0ec1/preprocessing/rus_preprocessing_udpipe.py): [kutuzov/rus_preprocessing_udpipe.py](src/scripts/preprocessing/kutuzov/rus_preprocessing_udpipe.py)
+- Liza's method: [liza/CAT_preprocessing.py](src/scripts/preprocessing/liza/CAT_preprocessing.py)
 
 The `src` folder includes files for preprocessing html files extracted via the PDFBox method.
 The `preprocess.py` script uses the `HtmlPreprocessor` class to extract only the body text of the academic paper.
@@ -170,6 +169,9 @@ three methods:
 
 The default is to use the TreeTagger method, keep Part-of-Speech tags, and remove punctuation (only relevant for UDPipe).
 
+The [`attest_collocation.ipynb`](attest_collocation.ipynb) colab file outlines the 
+process of lemmatizing collocations.
+
 Note: The UDPipe method will automatically download Kutuzov's latest trained UDPipe model. Must run `pip install ufal.udpipe`. [Tutorial](https://github.com/akutuzov/webvectors/blob/master/preprocessing/rusvectores_tutorial.ipynb) \
 Note: The TreeTagger method requires additional installation, which can be done by running the following from the `src`
 folder:
@@ -191,7 +193,7 @@ the directory `data/preprocessed/tokens`.
 
 *Note: In the future, the following script should be refactored into the existing `preprocess.py` file.*
 
-The `src/combine_preprocessed_text.py` script combines all the preprocessed text into a 
+The [`src/combine_preprocessed_text.py`](src/combine_preprocessed_text.py) script combines all the preprocessed text into a 
 single .txt file for ease of training. It is also used for further preprocessing of the 
 cybercat texts, preprocessed via Liza's method. 
 
@@ -215,11 +217,14 @@ This project learns four word embedding models:
 - [RoBERTa](https://github.com/huggingface/transformers): Huggingface implementation of the RuBERT model.
 
 Training is done via google colab on High RAM GPUs. This process is detailed in the 
-`train_models.ipynb` colab file.
+[`train_models.ipynb`](train_models.ipynb) colab file.
 
 ## Using trained models
 Trained word embedding models can be used for erroneous collocation correction. There
 are two different approaches, depending on the type of word embedding used.
+The [`attest_collocation.ipynb`](attest_collocation.ipynb) colab file elucidates
+these processes: lemmatization of input collocations, retrieval of collocation
+replacement suggestions, and attesting of collocations.
 
 ### Static word embedding approach
 This is the approach used for the w2v, fastText, and GloVe models. It follows our
@@ -230,15 +235,28 @@ un-fixed tokens that match the PoS tag of the original token.
 3. Rank attested collocations by various collocatiability scores.
 4. Select the collocations within a specified collocatiability threshold.
 
-Attesting collocations requires connecting
+Attesting collocations requires connecting to the cybercat database.
 
 ### Dynamic word embedding approach
 This approach applies to the RuBERT model, using masked language modeling to suggest
 one or more corrections to a collocation, given the source sentence as context.
 
-## Setting up a Gcloud MySQL instance of cybercat
+## Attesting Collocations and Calculating Collocatiability Scores
 Collocations are attested on the cybercat database, which can be run locally or
-through a cloud service. This project used gcloud and MySQL 8. A backup of the local
+through a cloud service. The `CollocationAttestor` class in the 
+[`src/collocation_attestor.py`](src/collocation_attestor.py) file
+contains the functionality  for verifying the existance of uni/bi/tri-grams
+in the cybercat database.
+
+This class is also responsible for the computation of 
+collocatiability statistics, in particular: **PMI, t-score, and ngram frequency**.
+
+Data returned from the `getCollocationReplacements` function can be passed
+into the `writeResults` function to save the data as a .txt file in
+csv format.
+
+### Setting up a Gcloud MySQL instance of cybercat
+This project used gcloud and **MySQL 8**. A backup of the local
 cybercat database was stored on gdrive and transferred to gcloud. Then, the backup
 was used to import the cybercat data onto a MySQL 8 server created in gcloud.
 
