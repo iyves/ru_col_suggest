@@ -58,7 +58,7 @@ class CollocationAttestor:
         """Creates a context manager for automatically opening and closing a connection
         to the cybercat db.
         """
-        self.connection = mysql.connector.connect(host=HOST, database=DOMAIN, user=USER, password=PWD)
+        self.connection = mysql.connector.connect(host=self.host, database=self.domain, user=self.user, password=self.password)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -81,8 +81,8 @@ class CollocationAttestor:
             query_result = self._execute_query(
                 """
                 SELECT COUNT(distinct lemma)
-                FROM cybercat.lemmas;
-                """
+                FROM {}.lemmas;
+                """.format(self.domain)
             )
             CollocationAttestor._domain_size = query_result[0][0]
         return CollocationAttestor._domain_size
@@ -109,12 +109,12 @@ class CollocationAttestor:
                     SELECT lemmas.lemma, SUM(uni.freq_all)
                     FROM
                         (SELECT id_lemmas, lemma 
-                        FROM cybercat.lemmas
+                        FROM {1}.lemmas
                         WHERE hex(lemma) in (hex('{}'))
                         ) as lemmas
-                    LEFT JOIN cybercat.unigrams as uni ON uni.lemma = lemmas.id_lemmas
+                    LEFT JOIN {1}.unigrams as uni ON uni.lemma = lemmas.id_lemmas
                     GROUP BY lemmas.lemma;
-                    """.format("'), hex('".join(uncached_ngrams))
+                    """.format("'), hex('".join(uncached_ngrams), self.domain)
                 )
             elif n == 2:
                 query_result = self._execute_query(
@@ -122,15 +122,15 @@ class CollocationAttestor:
                     SELECT CONCAT(l1.lemma, " ", l2.lemma) as "bigram", SUM(bi_lemma.raw_frequency) as "frequency"
                     FROM 
                         (SELECT uni1.lemma as "lemma1", uni2.lemma as "lemma2", bi.raw_frequency
-                        FROM cybercat.2grams as bi
-                        LEFT JOIN cybercat.unigrams uni1 ON bi.wordform_1 = uni1.id_unigram
-                        LEFT JOIN cybercat.unigrams uni2 ON bi.wordform_2 = uni2.id_unigram
+                        FROM {1}.2grams as bi
+                        LEFT JOIN {1}.unigrams uni1 ON bi.wordform_1 = uni1.id_unigram
+                        LEFT JOIN {1}.unigrams uni2 ON bi.wordform_2 = uni2.id_unigram
                         ) as bi_lemma
-                    LEFT JOIN cybercat.lemmas l1 ON bi_lemma.lemma1 = l1.id_lemmas
-                    LEFT JOIN cybercat.lemmas l2 ON bi_lemma.lemma2 = l2.id_lemmas
-                    WHERE hex(CONCAT(l1.lemma, " ", l2.lemma)) in (hex('{}'))
+                    LEFT JOIN {1}.lemmas l1 ON bi_lemma.lemma1 = l1.id_lemmas
+                    LEFT JOIN {1}.lemmas l2 ON bi_lemma.lemma2 = l2.id_lemmas
+                    WHERE hex(CONCAT(l1.lemma, " ", l2.lemma)) in (hex('{0}'))
                     GROUP BY CONCAT(l1.lemma, " ", l2.lemma);
-                    """.format("'), hex('".join(uncached_ngrams))
+                    """.format("'), hex('".join(uncached_ngrams), self.domain)
                 )
             elif n == 3:
                 query_result = self._execute_query(
@@ -140,19 +140,19 @@ class CollocationAttestor:
                         (SELECT l1.lemma as "lemma1", l2.lemma as "lemma2", l3.lemma as "lemma3", tokens.id_trigram
                         FROM
                             (SELECT u1.lemma as t1, u2.lemma as t2, u3.lemma as t3, 3g.id_trigram as id_trigram 
-                            FROM cybercat.3grams_tokens as 3g
-                            LEFT JOIN cybercat.unigrams u1 ON 3g.w1 = u1.id_unigram
-                            LEFT JOIN cybercat.unigrams u2 ON 3g.w2 = u2.id_unigram
-                            LEFT JOIN cybercat.unigrams u3 ON 3g.w3 = u3.id_unigram
+                            FROM {1}.3grams_tokens as 3g
+                            LEFT JOIN {1}.unigrams u1 ON 3g.w1 = u1.id_unigram
+                            LEFT JOIN {1}.unigrams u2 ON 3g.w2 = u2.id_unigram
+                            LEFT JOIN {1}.unigrams u3 ON 3g.w3 = u3.id_unigram
                             ) as tokens
-                        LEFT JOIN cybercat.lemmas l1 ON tokens.t1 = l1.id_lemmas
-                        LEFT JOIN cybercat.lemmas l2 ON tokens.t2 = l2.id_lemmas
-                        LEFT JOIN cybercat.lemmas l3 ON tokens.t3 = l3.id_lemmas
-                        WHERE hex(CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma)) in (hex('{}'))
+                        LEFT JOIN {1}.lemmas l1 ON tokens.t1 = l1.id_lemmas
+                        LEFT JOIN {1}.lemmas l2 ON tokens.t2 = l2.id_lemmas
+                        LEFT JOIN {1}.lemmas l3 ON tokens.t3 = l3.id_lemmas
+                        WHERE hex(CONCAT(l1.lemma, " ", l2.lemma, " ", l3.lemma)) in (hex('{0}'))
                         ) as matches
-                    LEFT JOIN cybercat.3grams 3g_uni ON matches.id_trigram = 3g_uni.id_trigram
+                    LEFT JOIN {1}.3grams 3g_uni ON matches.id_trigram = 3g_uni.id_trigram
                     GROUP BY CONCAT(matches.lemma1, " ", matches.lemma2, " ", matches.lemma3);
-                    """.format("'), hex('".join(uncached_ngrams))
+                    """.format("'), hex('".join(uncached_ngrams), self.domain)
                 )
             else:
                 logging.error("Can only get frequencies of 1/2/3-grams!")
@@ -181,8 +181,8 @@ class CollocationAttestor:
         trigrams.
 
         :param lemmas: Two lists (bigrams) or three lists (trigrams) of tokens
-            to attest. Ex. [['мочь']], [['быть', 'делать']] for 'мочь быть' and 'мочь делать'
-            or [['рассматривать'], ['потребность', 'школа'] ['экономика']] for
+            to attest. Ex. [['мочь'], ['быть', 'делать']] for 'мочь быть' and 'мочь делать'
+            or [['рассматривать'], ['потребность', 'школа'], ['экономика']] for
             'рассматривать потребность экономика' and 'рассматривать школа экономика'.
         :return The lemmatized bigrams or trigrams if they exist in the cybercat db.
         """
@@ -191,30 +191,30 @@ class CollocationAttestor:
             query = """SELECT DISTINCT l1.lemma as "lemma1", l2.lemma as "lemma2"
             FROM 
                 (SELECT uni1.lemma as "lemma1", uni2.lemma as "lemma2"
-                FROM cybercat.2grams as bi
-                LEFT JOIN cybercat.unigrams uni1 ON bi.wordform_1 = uni1.id_unigram
-                LEFT JOIN cybercat.unigrams uni2 ON bi.wordform_2 = uni2.id_unigram
+                FROM {2}.2grams as bi
+                LEFT JOIN {2}.unigrams uni1 ON bi.wordform_1 = uni1.id_unigram
+                LEFT JOIN {2}.unigrams uni2 ON bi.wordform_2 = uni2.id_unigram
                 ) as bi_lemma
-            LEFT JOIN cybercat.lemmas l1 ON bi_lemma.lemma1 = l1.id_lemmas
-            LEFT JOIN cybercat.lemmas l2 ON bi_lemma.lemma2 = l2.id_lemmas
-            WHERE l1.lemma IN ('{}') AND l2.lemma IN ('{}');
-            """.format("','".join(lemmas[0]), "','".join(lemmas[1]))
+            LEFT JOIN {2}.lemmas l1 ON bi_lemma.lemma1 = l1.id_lemmas
+            LEFT JOIN {2}.lemmas l2 ON bi_lemma.lemma2 = l2.id_lemmas
+            WHERE l1.lemma IN ('{0}') AND l2.lemma IN ('{1}');
+            """.format("','".join(lemmas[0]), "','".join(lemmas[1]), self.domain)
         # trigrams
         elif len(lemmas) == 3:
             query = """
             SELECT DISTINCT l1.lemma as "lemma1", l2.lemma as "lemma2", l3.lemma as "lemma3"
             FROM
                 (SELECT u1.lemma as t1, u2.lemma as t2, u3.lemma as t3
-                FROM cybercat.3grams_tokens as 3g
-                LEFT JOIN cybercat.unigrams u1 ON 3g.w1 = u1.id_unigram
-                LEFT JOIN cybercat.unigrams u2 ON 3g.w2 = u2.id_unigram
-                LEFT JOIN cybercat.unigrams u3 ON 3g.w3 = u3.id_unigram
+                FROM {3}.3grams_tokens as 3g
+                LEFT JOIN {3}.unigrams u1 ON 3g.w1 = u1.id_unigram
+                LEFT JOIN {3}.unigrams u2 ON 3g.w2 = u2.id_unigram
+                LEFT JOIN {3}.unigrams u3 ON 3g.w3 = u3.id_unigram
                 ) as tokens
-            LEFT JOIN cybercat.lemmas l1 ON tokens.t1 = l1.id_lemmas
-            LEFT JOIN cybercat.lemmas l2 ON tokens.t2 = l2.id_lemmas
-            LEFT JOIN cybercat.lemmas l3 ON tokens.t3 = l3.id_lemmas
-            WHERE l1.lemma in ('{}') AND l2.lemma IN ('{}') AND l3.lemma IN ('{}');
-            """.format("','".join(lemmas[0]), "','".join(lemmas[1]), "','".join(lemmas[2]))
+            LEFT JOIN {3}.lemmas l1 ON tokens.t1 = l1.id_lemmas
+            LEFT JOIN {3}.lemmas l2 ON tokens.t2 = l2.id_lemmas
+            LEFT JOIN {3}.lemmas l3 ON tokens.t3 = l3.id_lemmas
+            WHERE l1.lemma in ('{0}') AND l2.lemma IN ('{1}') AND l3.lemma IN ('{2}');
+            """.format("','".join(lemmas[0]), "','".join(lemmas[1]), "','".join(lemmas[2]), self.domain)
         else:
             logging.error("Error: Can attest 2-grams or 3-grams only")
             return []
