@@ -9,7 +9,7 @@ from typing import Iterable, List
 from enum import Enum
 from pathlib import Path
 
-import src.scripts.preprocessing.kutuzov.rus_preprocessing_udpipe as kutuzov
+import scripts.preprocessing.kutuzov.rus_preprocessing_udpipe as kutuzov
 
 # Set up the configuration
 path_current_directory = os.path.dirname(__file__)
@@ -17,7 +17,7 @@ path_config_file = os.path.join(path_current_directory, '../',
                                 'config.ini')
 config = configparser.ConfigParser()
 config.read(path_config_file)
-models_dir = config['PATHS']['models_dir']
+treetagger_dir = config['PATHS']['treetagger_dir']
 log_dir = config['PATHS']['log_dir']
 log_file = str(Path(log_dir, 'tokenize.txt'))
 logging.basicConfig(handlers=[logging.FileHandler(log_file, 'a', 'utf-8')],
@@ -50,9 +50,9 @@ class Tokenizer:
         self.method = method
         if self.method == self.Method.TREETAGGER:
             if Tokenizer.tagger is None:
-                Tokenizer.tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR=str(Path(models_dir)))
+                Tokenizer.tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR=str(Path(treetagger_dir)))
             if Tokenizer.tag_table is None:
-                Tokenizer.tag_table = pandas.read_table(str(Path(models_dir, 'ru-table.tab')))
+                Tokenizer.tag_table = pandas.read_csv(str(Path(treetagger_dir, 'ru-table.tab')), sep='\t')
         elif self.method == self.Method.UDPIPE:
             if Tokenizer.process_pipeline is None:
                 Tokenizer.model, Tokenizer.process_pipeline = kutuzov.load_model()
@@ -60,7 +60,7 @@ class Tokenizer:
             logging.error("Can only tokenize via treetagger, udpipe, or mystem")
             raise
 
-    def tokenize(self, sentences: Iterable[str], keep_pos: bool = True,
+    def tokenize(self, sentence: str, keep_pos: bool = True,
                  keep_punct: bool = False) -> List[str]:
         """Tokenize a list of sentences via the selected method.
 
@@ -71,39 +71,35 @@ class Tokenizer:
             for UDPipe. Default: False
         :return A list containing the tokenized input sentences.
         """
-        ret = []
-        for sentence in sentences:
-            res = kutuzov.unify_sym(sentence.strip())
-            if self.method is self.Method.UDPIPE:
-                output = " ".join(kutuzov.process(Tokenizer.process_pipeline,
-                                                  text=res, keep_pos=keep_pos, keep_punct=keep_punct))
-                ret.append(output.replace("numarab_PROPN", "numarab_NUM")
-                                 .replace("numlat_PROPN", "numlat_NUM"))
-            elif self.method is self.Method.TREETAGGER:
-                if res[-1] not in ['.', '!', '?']:
-                    res += '.'
+        res = kutuzov.unify_sym(sentence.strip())
+        if self.method is self.Method.UDPIPE:
+            output = " ".join(kutuzov.process(Tokenizer.process_pipeline,
+                                                text=res, keep_pos=keep_pos, keep_punct=keep_punct))
+            output = output.replace("numarab_PROPN", "numarab_NUM").replace("numlat_PROPN", "numlat_NUM")
+        elif self.method is self.Method.TREETAGGER:
+            if res[-1] not in ['.', '!', '?']:
+                res += '.'
 
-                tags = Tokenizer.tagger.tag_text(res)
-                tags = [t.split() for t in tags]
-                sentence = []
-                for t in tags:
-                    if keep_pos:
-                        if t[1] != 'SENT' and t[1][0] in Tokenizer.accepted_tags:
-                            lemma_tag = t[2] + "_" + t[1][0]
-                            if t[0] == "numarab" or t[0] == "numlat":
-                                lemma_tag = t[2] + "_M"
-                            if keep_pos:
-                                sentence.append(lemma_tag)
-                    else:
-                        sentence.append(t[2])
-                output = " ".join(sentence)
-                ret.append(output)
-            elif self.method is self.Method.MYSTEM:
-                raise NotImplementedError
-            else:
-                logging.error("Can only tokenize via treetagger, udpipe, or mystem")
-                raise NotImplementedError
-        return ret
+            tags = Tokenizer.tagger.tag_text(res)
+            tags = [t.split() for t in tags]
+            sentence = []
+            for t in tags:
+                if keep_pos:
+                    if t[1] != 'SENT' and t[1][0] in Tokenizer.accepted_tags:
+                        lemma_tag = t[2] + "_" + t[1][0]
+                        if t[0] == "numarab" or t[0] == "numlat":
+                            lemma_tag = t[2] + "_M"
+                        if keep_pos:
+                            sentence.append(lemma_tag)
+                else:
+                    sentence.append(t[2])
+            output = " ".join(sentence)
+        elif self.method is self.Method.MYSTEM:
+            raise NotImplementedError
+        else:
+            logging.error("Can only tokenize via treetagger, udpipe, or mystem")
+            raise NotImplementedError
+        return output
 
     def tokenize_file(self, input_file, output_file, keep_pos: bool = True,
                       keep_punct: bool = False, batch: int = 10000, start: int = 0,
@@ -131,7 +127,7 @@ class Tokenizer:
                 break
 
             if total >= start:
-                sentence.append(self.tokenize([sentence, keep_pos, keep_punct])[0])
+                sentences.append(self.tokenize(sentence, keep_pos, keep_punct))
 
                 if total % batch == 0:
                     logging.info(f"Processed {len(sentences)} sentences")
