@@ -10,3 +10,4 @@ __pycache__
 
 data
 src/models
+src/treetagger/*
