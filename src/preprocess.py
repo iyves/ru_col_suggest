@@ -4,9 +4,9 @@ import os
 
 from joblib import delayed, Parallel
 from pathlib import Path
-from src.helpers import get_file_names, get_text
-from src.html_preprocessor import HtmlPreprocessor
-from src.tokenizer import Tokenizer
+from helpers import get_file_names, get_text
+from html_preprocessor import HtmlPreprocessor
+from tokenizer import Tokenizer
 
 # Set up the configuration
 path_current_directory = os.path.dirname(__file__)
@@ -38,6 +38,7 @@ def preprocess_one(filename, file, target_txt_path, target_token_path,
         logging.error("Error: Failed to preprocesses file: {}".format(filename))
         return False
 
+    logging.info("Preprocessed html -> txt: {}".format(filename))
     # Save preprocessed text as txt file
     output_txt_file = Path(target_txt_path, filename + ".txt")
     if not os.path.isfile(output_txt_file):
