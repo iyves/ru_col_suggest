@@ -13,7 +13,9 @@ import os
 import wget
 import re
 from pathlib import Path
-from ufal.udpipe import Model, Pipeline
+## uncomment to import udpipe
+## it avoids installing ufal.udpipe when not necessary for the user
+# from ufal.udpipe import Model, Pipeline
 
 path_current_directory = os.path.dirname(__file__)
 path_config_file = os.path.join(path_current_directory, '../../../../',
