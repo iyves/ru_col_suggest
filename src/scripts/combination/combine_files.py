@@ -25,7 +25,7 @@ def get_all_files(root: str, extension: str):
 
 
 ## taken from https://stackoverflow.com/questions/15203829/python-argparse-file-extension-checking
-def CheckExt(choices):
+def check_ext(choices):
     class Act(argparse.Action):
         def __call__(self, parser, namespace, tfile, option_string=None):
             ext = os.path.splitext(tfile)[1][1:]
