@@ -7,7 +7,6 @@ __pycache__
 *.model
 *.swp
 *.ini
-config.ini
 
 data
 src/models
