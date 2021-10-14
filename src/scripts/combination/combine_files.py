@@ -6,6 +6,10 @@ import logging
 """Combine all preprocessed text () from the cybercat corpus into one file.
 """
 
+period_after_cyrillic = re.compile('(?<=[а-яА-ЯёЁ])\.')
+capital_letter_before_dot = re.compile('[А-ЯЁ](?=\.)')
+journal_year = re.compile('[а-яА-ЯёЁ\.]+:[\Wа-яА-ЯёЁ]+NUM_arab')
+
 ## taken from check_parsed_files.py
 def get_all_files(root: str, extension: str):
     """
@@ -37,10 +41,33 @@ def check_ext(choices):
     return Act
 
 
+def find_corrupted_sentence(sentence) -> bool:
+    '''
+    Returns True if:
+    - many name contractions are found in the sentence
+    - journal names + num_arab tag is found in line
+    
+    :param sentence: line of text from e.g. f.readlines()
+    :return: True if  
+    '''
+    s = re.sub(period_after_cyrillic, ' ', sentence)
+    tokens = s.split()
+    if len(tokens) < 12:
+        letters_before_dot = re.findall(capital_letter_before_dot, sentence)
+        if len(letters_before_dot) / len(tokens) > 0.4:
+            return True
+        elif len(re.findall(journal_year, sentence)) > 0:
+            return True
+    else: 
+        return False
+
+
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('--source-dir', help='source directory')
-    parser.add_argument('--target-file', action=CheckExt({'txt', }), help='target .txt file')
+    parser.add_argument('--target-file', action=check_ext({'txt', }), help='target .txt file')
+    parser.add_argument('--writing-mode', help='mode can be w (write truncating the file first) or a (write appending to the end of the file if it exists')
+    parser.add_argument('--min-length', help='min text length to consider')
     parser.add_argument('-v', '--verbose', action='count', default=0)
     args = parser.parse_args()
     return args
@@ -56,22 +83,32 @@ def main() -> None:
 
     source_files = sorted(get_all_files(args.source_dir, ".txt"))
     target_filename = os.path.abspath(args.target_file)
+    mode = str(args.writing_mode)
+    m = mode if mode == 'a' or mode == 'w' else 'w'
+    min_length = int(args.min_length)
 
     full_corpus_target_dir = os.path.dirname(target_filename)
     if not os.path.exists(full_corpus_target_dir):
         os.makedirs(full_corpus_target_dir)
-    with open(target_filename, 'w', encoding='utf-8') as to_write:
+    with open(target_filename, m, encoding='utf-8') as to_write:
         for i, file in enumerate(source_files, 1):
             if i % 1000 == 0:
                 print(f'{i} files processed')
-            for sentence in open(file, 'r', encoding='utf-8'):
-                s = re.sub(' +', ' ', sentence)
-                s = s.replace(" ", "").replace(" .", ".").replace(" ,", ",")
-                lens = [len(word) for word in s.split() if word != "NUM_arab"]
-                if len(lens) >= 5:
-                    avg = sum(lens) / len(lens)
-                    if avg > 5:
-                        to_write.write(s)
+            with open(file, 'r', encoding='utf-8') as f:
+                sentences = f.readlines()
+                join_sentences = '\n'.join(sentences)
+                if len(join_sentences.split()) > min_length:
+                    for sentence in sentences:
+                        s = re.sub(' +', ' ', sentence)
+                        s = s.replace(" ", "").replace(" .", ".").replace(" ,", ",")
+                        lens = [len(word) for word in s.split() if word != "NUM_arab"]
+                        len_sentence = len(s.split())
+                        if len(lens) >= 5 and len_sentence > 5:
+                            avg = sum(lens) / len(lens)
+                            if avg > 5 and not find_corrupted_sentence(s):
+                                to_write.write(s)
+                        else:
+                            print(s)
 
 
 if __name__ == '__main__':
