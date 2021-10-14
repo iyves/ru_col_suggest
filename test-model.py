@@ -10,9 +10,10 @@ config.read(path_config_file)
 models_dir = config['PATHS']['models_dir']
 models = 'Economics Education_and_psychology History Law Linguistics Sociology supercybercat'
 training_epochs = '30epx 100epx'
+words_to_search = 'хельсинки_n встречать_v замок_n экономика_n доход_n'
 
 def main():
-    model = Word2Vec.load("/scratch/project_2004882/cat/ru_col_suggest/src/models/w2v/Economics.model")
+    model = Word2Vec.load("w2v/Economics.model")
     for word in 'хельсинки_n встречать_v замок_n экономика_n доход_n'.split():
         try:
             sims = model.wv.most_similar(word, topn=10)
