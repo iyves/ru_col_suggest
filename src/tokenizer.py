@@ -9,7 +9,7 @@ from typing import Iterable, List
 from enum import Enum
 from pathlib import Path
 
-import scripts.preprocessing.kutuzov.rus_preprocessing_udpipe as kutuzov
+import src.scripts.preprocessing.kutuzov.rus_preprocessing_udpipe as kutuzov
 
 # Set up the configuration
 path_current_directory = os.path.dirname(__file__)
