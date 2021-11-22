@@ -17,8 +17,6 @@ data_dir = config['PATHS']['data_dir']
 lemmas_dir = 'preprocessed/full_domains/lemmas/'
 log_dir = config['PATHS']['log_dir']
 log_file = os.path.join(log_dir, 'training.txt')
-# logging.basicConfig(handlers=[logging.FileHandler(log_file, 'a', 'utf-8')],
-#                     format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 paths = [  
@@ -40,19 +38,19 @@ paths = [
 
 CONTEXT_WINDOW = 5 # 5, 10
 MIN_COUNT = 5
-# EPOCHS = 100
+EPOCHS = 30
 SIZE = 500 # 200, 300, 500
 CORES = 40
 
 def main():
-  for epochs in [30, 100]:
+  for size in [300, 500]:
     for datapath in paths:
       print(f'Started training for: {datapath}', flush=True)
-      model_name = os.path.splitext(os.path.basename(datapath))[0] + f'_{epochs}epx.model'
+      model_name = os.path.splitext(os.path.basename(datapath))[0] + f'_{size}vector_size.model'
       sentences = SentencesLoader(datapath)
       w2v_loss_logger = LossLogger()
-      w2v_model = Word2Vec(sentences=sentences, size=SIZE, window=CONTEXT_WINDOW, 
-                          min_count=MIN_COUNT, workers=CORES, iter=epochs, 
+      w2v_model = Word2Vec(sentences=sentences, vector_size=size, window=CONTEXT_WINDOW, 
+                          min_count=MIN_COUNT, workers=CORES, epochs=EPOCHS, 
                           callbacks=[w2v_loss_logger], compute_loss=True,)
       w2v_model.save(os.path.join(models_dir, 'w2v', model_name))
       print(w2v_loss_logger.losses, flush=True)
