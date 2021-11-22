@@ -31,7 +31,7 @@ DOMAIN = config['SERVER']['DOMAIN']
 HOST = config['SERVER']['HOST']
 USER = config['SERVER']['USER']
 PWD = config['SERVER']['PWD']
-
+PORT = config['SERVER']['PORT']
 
 class CollocationAttestor:
     """Verifies that collocations exist in the cybercat database and calculates
@@ -42,7 +42,7 @@ class CollocationAttestor:
     _domain_size = -1
     _collocation_stats = {}
 
-    def __init__(self, domain=DOMAIN, host=HOST, user=USER, password=PWD):
+    def __init__(self, domain=DOMAIN, host=HOST, user=USER, password=PWD, port=PORT):
         """Opens a connection with the cybercat database.
         :param domain: The domain name, default: use value from config.
         :param host: The IP address, default: use value from config.
@@ -53,12 +53,17 @@ class CollocationAttestor:
         self.host = host
         self.user = user
         self.password = password
+        self.port = port
 
     def __enter__(self):
         """Creates a context manager for automatically opening and closing a connection
         to the cybercat db.
         """
-        self.connection = mysql.connector.connect(host=self.host, database=self.domain, user=self.user, password=self.password)
+        self.connection = mysql.connector.connect(host=self.host, 
+                                                  database=self.domain, 
+                                                  user=self.user, 
+                                                  password=self.password,
+                                                  port=self.port)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
