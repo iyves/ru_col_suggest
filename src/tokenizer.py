@@ -17,7 +17,7 @@ path_config_file = os.path.join(path_current_directory, '../',
                                 'config.ini')
 config = configparser.ConfigParser()
 config.read(path_config_file)
-treetagger_dir = config['PATHS']['treetagger_dir']
+treetagger_dir = config['PATHS']['models_dir']
 log_dir = config['PATHS']['log_dir']
 log_file = str(Path(log_dir, 'tokenize.txt'))
 logging.basicConfig(handlers=[logging.FileHandler(log_file, 'a', 'utf-8')],
