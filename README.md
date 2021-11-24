@@ -46,6 +46,7 @@ DOMAIN=domain (i.e. cybercat)
 HOST=server_ip
 USER=username
 PWD=pwd
+PORT=port
 ```
 
 
@@ -173,10 +174,10 @@ The [`attest_collocation.ipynb`](attest_collocation.ipynb) colab file outlines t
 process of lemmatizing collocations.
 
 Note: The UDPipe method will automatically download Kutuzov's latest trained UDPipe model. Must run `pip install ufal.udpipe`. [Tutorial](https://github.com/akutuzov/webvectors/blob/master/preprocessing/rusvectores_tutorial.ipynb) \
-Note: The TreeTagger method requires additional installation, which can be done by running the following from the `src`
-folder:
+Note: The TreeTagger method requires additional installation, which can be done by running the following from the `src/treetagger`
+folder (substitute "x" with the latest version https://www.cis.lmu.de/~schmid/tools/TreeTagger/):
 ```
-wget https://www.cis.lmu.de/~schmid/tools/TreeTagger/data/tree-tagger-linux-3.2.3.tar.gz
+wget https://www.cis.lmu.de/~schmid/tools/TreeTagger/data/tree-tagger-linux-x.tar.gz
 wget https://www.cis.lmu.de/~schmid/tools/TreeTagger/data/tagger-scripts.tar.gz
 wget https://www.cis.lmu.de/~schmid/tools/TreeTagger/data/install-tagger.sh
 wget http://corpus.leeds.ac.uk/mocky/russian.par.gz

@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Iterable
 
-import src.scripts.preprocessing.kutuzov.rus_preprocessing_udpipe as kutuzov
+import scripts.preprocessing.kutuzov.rus_preprocessing_udpipe as kutuzov
 
 
 # Set up the configuration
@@ -59,7 +59,7 @@ class HtmlPreprocessor:
     phase1_enumerated = r"[1-9]?[0-9]"
     phase1_footnote = re.compile(r"^{} .+".format(phase1_enumerated))
     phase1_quoted_text = re.compile(r"[«“„'\"].*?[»”'\"“]", re.MULTILINE | re.DOTALL)
-    phase1_eol_hyphenation_in_paragraph = re.compile(r"[^\s]-\s*\n")
+    phase1_eol_hyphenation_in_paragraph = re.compile(r"(?<=[^\s])-\s*\n")
     phase1_end_of_sentence = re.compile(r"([!?])|(:\s*$)")
     phase1_paragraph_ends_with_period = r"\.\s*$"
     phase1_has_lowercase = r"[а-яё]"
@@ -95,6 +95,10 @@ class HtmlPreprocessor:
         r"(?![{0}{1}])[{2}]+?(?=$|[{0}{1}])"
             .format(phase1_whitespace, phase1_punctuation, phase1_roman_numeral),
         re.MULTILINE)
+
+    phase2_period_after_cyrillic = re.compile('(?<=[а-яА-ЯёЁ])\.')
+    phase2_capital_letter_before_dot = re.compile('[А-ЯЁ](?=\.)')
+    phase2_journal_year = re.compile('[а-яА-ЯёЁ\.]+:[\Wа-яА-ЯёЁ]+NUM_arab')
 
     # From https://stackoverflow.com/questions/14596884/remove-text-between-and-in-python/14598135#14598135
     @classmethod
@@ -527,6 +531,82 @@ class HtmlPreprocessor:
                 self.text.pop(i)
         return amount_removed
 
+    def remove_plus_sign_and_empty_spaces(self):
+        """Removes plus signs and replaces empty spaces before punctuation     
+        """
+        for i in reversed(range(len(self.text))):
+            for j in reversed(range(len(self.text[i]))):
+                for k in reversed(range(len(self.text[i][j]))):
+                    # Remove sentences with unwanted tokens
+                    sentence = self.text[i][j][k]
+                    sentence = re.sub(' +', ' ', sentence)
+                    sentence = sentence.replace(" ", "").replace(" .", ".").replace(" ,", ",")
+                    self.text[i][j][k] = sentence
+
+                # Remove empty paragraphs
+                if len(self.text[i][j]) < 1:
+                    self.text[i].pop(j)
+            # Remove empty pages
+            if len(self.text[i]) < 1:
+                self.text.pop(i)
+
+    def remove_short_sentences(self):
+        """Removes short sentences and sentences with too short words
+
+        :returns: The amount of removed sentences 
+        """
+        amount_removed = 0
+        for i in reversed(range(len(self.text))):
+            for j in reversed(range(len(self.text[i]))):
+                for k in reversed(range(len(self.text[i][j]))):
+                    # Remove sentences with unwanted tokens
+                    sentence = self.text[i][j][k]
+                    lens = [len(word) for word in sentence.split() if word != "NUM_arab"]
+                    len_sentence = len(s.split())
+                    avg_len = sum(lens) / len(lens)
+                    if avg_len < 6 or len_sentence < 6:
+                        self.text[i][j].pop(k)
+                        amount_removed += 1
+
+                # Remove empty paragraphs
+                if len(self.text[i][j]) < 1:
+                    self.text[i].pop(j)
+            # Remove empty pages
+            if len(self.text[i]) < 1:
+                self.text.pop(i)
+        return amount_removed
+
+    def remove_corrupted_sentences(self):
+        """Removes sentences with many contractions 
+        and those containing "name contractions + NUM_ARAB" 
+        which usually indicates the journal name and year
+
+        :returns: The amount of removed sentences 
+        """
+        amount_removed = 0
+        for i in reversed(range(len(self.text))):
+            for j in reversed(range(len(self.text[i]))):
+                for k in reversed(range(len(self.text[i][j]))):
+                    # Remove sentences with unwanted tokens
+                    sentence = self.text[i][j][k]
+                    sentence = re.sub(phase2_period_after_cyrillic, ' ', sentence)
+                    tokens = sentence.split()
+                    if len(tokens) < 12:
+                        letters_before_dot = re.findall(phase2_capital_letter_before_dot, sentence)
+                        if len(letters_before_dot) / len(tokens) > 0.4:
+                            self.text[i][j].pop(k)
+                            amount_removed += 1
+                        elif len(re.findall(phase2_journal_year, sentence)) > 0:
+                            self.text[i][j].pop(k)
+                            amount_removed += 1
+                # Remove empty paragraphs
+                if len(self.text[i][j]) < 1:
+                    self.text[i].pop(j)
+            # Remove empty pages
+            if len(self.text[i]) < 1:
+                self.text.pop(i)
+        return amount_removed
+
     def preprocess(self) -> bool:
         # Phase 0 - HTML
         self.extract_text_from_html()
@@ -566,6 +646,9 @@ class HtmlPreprocessor:
         # Phase 2 - List of Pages and Paragraphs and Sentences
         self.break_paragraphs_into_sentences()
         self.remove_unwanted_sentences()
+        self.remove_plus_sign_and_empty_spaces()
+        self.remove_short_sentences()
+        self.remove_corrupted_sentences()
         if len(self.text) < 1:
             logging.error("Entire text was deleted after removing unwanted sentences: {}".format(self.filename))
             return False

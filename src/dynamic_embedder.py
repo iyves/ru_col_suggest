@@ -34,23 +34,32 @@ class DynamicEmbedder():
     """
 
     class Model(Enum):
-        """ The type of dynamicword embeddings to use.
+        """ The type of dynamic word embeddings to use.
         """
         BERT = 1
 
-    def __init__(self, model_type, src: str):
+    def __init__(self, model_type, src: str, fine_tuned: bool = False, tokenizer_name: str = None):
         """Initialize the embedding model.
 
         :param model_type: The type of embeddings to use.
         :param src: The path to the location of the word embedding model.
+        :param fine_tuned: whether the model was fined-tuned from a pretrained preexisting model
+        :param tokenizer_name: name of the tokenizer used during training
         """
         self.model_type = model_type
+        self.fine_tuned = fine_tuned
+        self.tokenizer_name = tokenizer_name
+        if self.fine_tuned and not self.tokenizer_name:
+            raise ValueError("If 'fine_tuned' is set to True, you should pass a huggingface tokenizer name to 'tokenizer_name'")
         self.load_model(src)
 
     def load_model(self, src: str):
         if self.model_type == self.Model.BERT:
             self.model = AutoModelForMaskedLM.from_pretrained(src)
-            self.tokenizer = AutoTokenizer.from_pretrained(src)
+            if self.fine_tuned:
+                self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name)
+            else:
+                self.tokenizer = AutoTokenizer.from_pretrained(src)
         else:
             logging.error("Can only load bert models.")
             raise NotImplementedError
@@ -88,7 +97,7 @@ class DynamicEmbedder():
                 suggested_replacements.append(enumerate(words))
             for idx, token in enumerate(masked_ngram.split(" ")):
                 token = token.split("_")[0]
-                if "mask" in token:
+                if "mask" or "MASK" in token:
                     continue
                 else:
                     suggested_replacements.insert(idx, [(0, token)])
