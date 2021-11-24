@@ -35,7 +35,6 @@ models, and logs reside. It also contains the connection information for attesti
 collocations against the cybercat database. The format of this file is as follows:
 ```text
 [PATHS]
-treetagger_dir=path/to/ru_col_suggest/src/treetaggers
 models_dir=path/to/ru_col_suggest/src/models
 log_dir=path/to/ru_col_suggest/data/log
 data_dir=path/to/ru_col_suggest/data/
@@ -47,6 +46,7 @@ DOMAIN=domain (i.e. cybercat)
 HOST=server_ip
 USER=username
 PWD=pwd
+PORT=port
 ```
 
 
