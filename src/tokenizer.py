@@ -17,7 +17,7 @@ path_config_file = os.path.join(path_current_directory, '../',
                                 'config.ini')
 config = configparser.ConfigParser()
 config.read(path_config_file)
-treetagger_dir = config['PATHS']['models_dir']
+models_dir = config['PATHS']['models_dir']
 log_dir = config['PATHS']['log_dir']
 log_file = str(Path(log_dir, 'tokenize.txt'))
 logging.basicConfig(handlers=[logging.FileHandler(log_file, 'a', 'utf-8')],
@@ -50,9 +50,9 @@ class Tokenizer:
         self.method = method
         if self.method == self.Method.TREETAGGER:
             if Tokenizer.tagger is None:
-                Tokenizer.tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR=str(Path(treetagger_dir)))
+                Tokenizer.tagger = treetaggerwrapper.TreeTagger(TAGLANG='ru', TAGDIR=str(Path(models_dir)))
             if Tokenizer.tag_table is None:
-                Tokenizer.tag_table = pandas.read_csv(str(Path(treetagger_dir, 'ru-table.tab')), sep='\t')
+                Tokenizer.tag_table = pandas.read_csv(str(Path(models_dir, 'ru-table.tab')), sep='\t')
         elif self.method == self.Method.UDPIPE:
             if Tokenizer.process_pipeline is None:
                 Tokenizer.model, Tokenizer.process_pipeline = kutuzov.load_model()
