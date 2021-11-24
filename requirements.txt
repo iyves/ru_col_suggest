@@ -1,6 +1,3 @@
 allennlp
 pytest
-beautifulsoup4
-django
-treetaggerwrapper
 
